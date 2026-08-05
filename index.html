@@ -164,7 +164,9 @@
   .box-group .swatch { width: 12px; height: 12px; border-radius: 2px; border: 2px solid; flex: none; }
   .box-group .name { flex: 1; }
   .box-group button { padding: 2px 7px; font-size: .75rem; line-height: 1.2; min-height: 0; }
-  .box-group ~ .box-item { margin-left: 14px; }
+  summary.box-group { list-style: none; cursor: pointer; user-select: none; }
+  summary.box-group::-webkit-details-marker { display: none; }
+  .box-group-details .box-item { margin-left: 14px; margin-top: 6px; }
   .box-item {
     display: flex;
     align-items: center;
@@ -312,8 +314,6 @@
     <section>
       <div class="btn-row">
         <button id="btn-ai" class="primary" disabled>AI再解析</button>
-        <button id="btn-ai-clear" disabled>AI分を消す</button>
-        <button id="btn-mask" disabled>抽出を見る</button>
       </div>
       <div class="row">
         <label for="ai-grid">粗さ</label>
@@ -324,13 +324,19 @@
     </section>
 
     <section style="flex:1">
-      <h2>レイヤー</h2>
-      <div id="box-list"></div>
+      <details>
+        <summary>レイヤー</summary>
+        <div id="box-list"></div>
+      </details>
     </section>
 
     <section>
       <details>
         <summary>詳細設定</summary>
+        <div class="btn-row" style="margin-bottom:4px;">
+          <button id="btn-ai-clear" disabled>AI分を消す</button>
+          <button id="btn-mask" disabled>抽出を見る</button>
+        </div>
         <div class="row">
           <label for="opacity">塗り</label>
           <input type="range" id="opacity" min="0" max="100" value="30">
@@ -692,13 +698,19 @@ function render() {
   renderList();
 }
 
+const openGroups = new Set(); // 再描画をまたいで開閉状態を保持
+
 function renderList() {
   boxList.innerHTML = '';
   for (const t of TYPES) {
     const list = boxes.filter(b => b.type === t.id);
     if (!list.length) continue;
-    // グループ見出し
-    const head = document.createElement('div');
+    // グループ（デフォルト折りたたみ）
+    const group = document.createElement('details');
+    group.className = 'box-group-details';
+    group.open = openGroups.has(t.id);
+    group.ontoggle = () => { group.open ? openGroups.add(t.id) : openGroups.delete(t.id); };
+    const head = document.createElement('summary');
     head.className = 'box-group';
     head.innerHTML =
       `<span class="swatch" style="border-color:${t.color};background:${t.color}44"></span>` +
@@ -707,14 +719,17 @@ function renderList() {
     const delAll = document.createElement('button');
     delAll.textContent = '×';
     delAll.title = `${t.label}をすべて削除`;
-    delAll.onclick = () => {
+    delAll.onclick = ev => {
+      ev.preventDefault();
+      ev.stopPropagation();
       snapshot();
       boxes = boxes.filter(x => x.type !== t.id);
       if (selectedId != null && !boxes.some(b => b.id === selectedId)) selectedId = null;
       render();
     };
     head.appendChild(delAll);
-    boxList.appendChild(head);
+    group.appendChild(head);
+    boxList.appendChild(group);
     // グループ内アイテム
     list.forEach((b, i) => {
       const item = document.createElement('div');
@@ -734,7 +749,7 @@ function renderList() {
       };
       item.appendChild(del);
       item.onclick = () => { selectedId = b.id; render(); };
-      boxList.appendChild(item);
+      group.appendChild(item);
     });
   }
 }
