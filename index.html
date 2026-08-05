@@ -152,6 +152,19 @@
     color: var(--text-dim);
     font-size: .8rem;
   }
+  .box-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 2px 2px;
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--text-dim);
+  }
+  .box-group .swatch { width: 12px; height: 12px; border-radius: 2px; border: 2px solid; flex: none; }
+  .box-group .name { flex: 1; }
+  .box-group button { padding: 2px 7px; font-size: .75rem; line-height: 1.2; min-height: 0; }
+  .box-group ~ .box-item { margin-left: 14px; }
   .box-item {
     display: flex;
     align-items: center;
@@ -681,29 +694,48 @@ function render() {
 
 function renderList() {
   boxList.innerHTML = '';
-  const counts = {};
-  for (const b of boxes) {
-    const t = typeOf(b.type);
-    counts[b.type] = (counts[b.type] || 0) + 1;
-    const item = document.createElement('div');
-    item.className = 'box-item' + (b.id === selectedId ? ' selected' : '');
-    item.innerHTML =
+  for (const t of TYPES) {
+    const list = boxes.filter(b => b.type === t.id);
+    if (!list.length) continue;
+    // グループ見出し
+    const head = document.createElement('div');
+    head.className = 'box-group';
+    head.innerHTML =
       `<span class="swatch" style="border-color:${t.color};background:${t.color}44"></span>` +
-      `<span class="name">${t.label} ${counts[b.type]}</span>` +
-      `<span class="dims mono">${Math.round(b.w)}×${Math.round(b.h)}</span>`;
-    const del = document.createElement('button');
-    del.textContent = '×';
-    del.title = '削除';
-    del.onclick = ev => {
-      ev.stopPropagation();
+      `<span class="name">${t.label}</span>` +
+      `<span class="dims mono">${list.length}</span>`;
+    const delAll = document.createElement('button');
+    delAll.textContent = '×';
+    delAll.title = `${t.label}をすべて削除`;
+    delAll.onclick = () => {
       snapshot();
-      boxes = boxes.filter(x => x.id !== b.id);
-      if (selectedId === b.id) selectedId = null;
+      boxes = boxes.filter(x => x.type !== t.id);
+      if (selectedId != null && !boxes.some(b => b.id === selectedId)) selectedId = null;
       render();
     };
-    item.appendChild(del);
-    item.onclick = () => { selectedId = b.id; render(); };
-    boxList.appendChild(item);
+    head.appendChild(delAll);
+    boxList.appendChild(head);
+    // グループ内アイテム
+    list.forEach((b, i) => {
+      const item = document.createElement('div');
+      item.className = 'box-item' + (b.id === selectedId ? ' selected' : '');
+      item.innerHTML =
+        `<span class="name">${t.label} ${i + 1}</span>` +
+        `<span class="dims mono">${Math.round(b.w)}×${Math.round(b.h)}</span>`;
+      const del = document.createElement('button');
+      del.textContent = '×';
+      del.title = '削除';
+      del.onclick = ev => {
+        ev.stopPropagation();
+        snapshot();
+        boxes = boxes.filter(x => x.id !== b.id);
+        if (selectedId === b.id) selectedId = null;
+        render();
+      };
+      item.appendChild(del);
+      item.onclick = () => { selectedId = b.id; render(); };
+      boxList.appendChild(item);
+    });
   }
 }
 
