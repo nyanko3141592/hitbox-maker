@@ -291,6 +291,7 @@
       <div class="btn-row">
         <button id="btn-ai" class="primary" disabled>再解析</button>
         <button id="btn-ai-clear" disabled>AI生成分を消す</button>
+        <button id="btn-mask" disabled>抽出部分を見る</button>
       </div>
       <div class="row">
         <label for="ai-grid">粗さ</label>
@@ -415,6 +416,10 @@ function loadFile(file) {
     aiBtn.disabled = false;
     aiClearBtn.disabled = true;
     maskCache = null;
+    maskOverlay = null;
+    showMask = false;
+    maskBtn.disabled = true;
+    maskBtn.textContent = '抽出部分を見る';
     render();
     URL.revokeObjectURL(url);
     autoAnnotate(); // 入れたら勝手に食らい判定
@@ -431,8 +436,8 @@ function toImageCoords(e) {
   };
 }
 function handleSize() {
-  const r = canvas.getBoundingClientRect();
-  return 10 * (canvas.width / r.width); // 表示上10px相当
+  const rw = canvas.getBoundingClientRect().width;
+  return 10 * (rw > 0 ? canvas.width / rw : 1); // 表示上10px相当
 }
 
 // ---- ヒットテスト ----
@@ -540,8 +545,9 @@ window.addEventListener('keydown', e => {
 function drawScene(c, uiLayer) {
   c.clearRect(0, 0, canvas.width, canvas.height);
   if (img) c.drawImage(img, 0, 0);
-  const scale = canvas.width / canvas.getBoundingClientRect().width || 1;
-  const sw = Math.max(1, strokeWidth * scale);
+  const rw = canvas.getBoundingClientRect().width;
+  const scale = rw > 0 ? canvas.width / rw : 1;
+  const sw = Math.max(1, Math.round(strokeWidth * scale));
 
   // 同タイプの矩形は結合して1つの歪なシルエットとして描く
   const groups = new Map();
@@ -557,7 +563,11 @@ function drawScene(c, uiLayer) {
     m.width = canvas.width; m.height = canvas.height;
     const mc = m.getContext('2d');
     mc.fillStyle = t.color;
-    for (const b of list) mc.fillRect(b.x, b.y, b.w, b.h);
+    for (const b of list) {
+      // 整数座標にスナップ（小数座標だとAAで結合部に細い継ぎ目が出る）
+      const x0 = Math.round(b.x), y0 = Math.round(b.y);
+      mc.fillRect(x0, y0, Math.round(b.x + b.w) - x0, Math.round(b.y + b.h) - y0);
+    }
     // 塗り: マスクごと半透明で載せる（重なりが濃くならない）
     c.globalAlpha = fillOpacity;
     c.drawImage(m, 0, 0);
@@ -578,6 +588,11 @@ function drawScene(c, uiLayer) {
     oc.globalCompositeOperation = 'destination-out';
     oc.drawImage(e, 0, 0);
     c.drawImage(o, 0, 0);
+  }
+  if (uiLayer && showMask && maskOverlay) {
+    c.globalAlpha = 0.55;
+    c.drawImage(maskOverlay, 0, 0);
+    c.globalAlpha = 1;
   }
   if (uiLayer && selectedId != null) {
     const b = boxes.find(x => x.id === selectedId);
@@ -659,6 +674,8 @@ const IMGLY_URL = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/
 let removeBackgroundFn = null;
 let lastBlob = null;   // 現在の画像の元Blob（imglyに渡す）
 let maskCache = null;  // {data: Uint8ClampedArray(アルファ), w, h} 現在の画像のマスク
+let maskOverlay = null; // デバッグ表示用のマスク着色キャンバス
+let showMask = false;
 
 aiGridEl.oninput = () => {
   document.getElementById('ai-grid-out').textContent = aiGridEl.value;
@@ -780,11 +797,35 @@ function playFlash() {
   f.classList.add('go');
 }
 
+function buildMaskOverlay() {
+  const m = document.createElement('canvas');
+  m.width = maskCache.w; m.height = maskCache.h;
+  const g = m.getContext('2d');
+  const id = g.createImageData(maskCache.w, maskCache.h);
+  for (let i = 0; i < maskCache.data.length; i++) {
+    id.data[i * 4]     = 0xf2; // accent #f2c14e
+    id.data[i * 4 + 1] = 0xc1;
+    id.data[i * 4 + 2] = 0x4e;
+    id.data[i * 4 + 3] = maskCache.data[i];
+  }
+  g.putImageData(id, 0, 0);
+  return m;
+}
+
+const maskBtn = document.getElementById('btn-mask');
+maskBtn.onclick = () => {
+  showMask = !showMask;
+  maskBtn.textContent = showMask ? '抽出表示中 ✓' : '抽出部分を見る';
+  render();
+};
+
 async function autoAnnotate() {
   aiBtn.disabled = true;
   startFunMessages();
   try {
     maskCache = await runSegmentation();
+    maskOverlay = buildMaskOverlay();
+    maskBtn.disabled = false;
     stopFunMessages();
     regenerateBoxes();
     playFlash();
