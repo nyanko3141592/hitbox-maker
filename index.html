@@ -254,6 +254,71 @@
     #flash.go { animation: none; opacity: 1; transition: opacity .2s; }
   }
 
+  /* ---- トップ画面 ---- */
+  #home {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    background:
+      repeating-linear-gradient(0deg, transparent 0 39px, #ffffff05 39px 40px),
+      repeating-linear-gradient(90deg, transparent 0 39px, #ffffff05 39px 40px),
+      var(--bg);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 20px 60px;
+    gap: 40px;
+  }
+  body.editing #home { display: none; }
+  #home .hero { text-align: center; max-width: 640px; }
+  #home .logo {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: clamp(1.8rem, 6vw, 3rem);
+    letter-spacing: .18em;
+    color: var(--accent);
+    text-transform: uppercase;
+    text-shadow: 0 0 30px #f2c14e44;
+  }
+  #home .logo span { color: var(--text-dim); font-weight: 400; }
+  #home .tagline {
+    margin-top: 18px;
+    font-size: clamp(1.05rem, 3.2vw, 1.4rem);
+    font-weight: 700;
+    text-wrap: balance;
+  }
+  #home .sub {
+    margin-top: 10px;
+    color: var(--text-dim);
+    font-size: .9rem;
+    line-height: 1.7;
+    text-wrap: balance;
+  }
+  #home .cta { margin-top: 26px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  #home button.big { padding: 13px 22px; font-size: 1rem; border-radius: 6px; }
+  #home .drop-hint { margin-top: 14px; color: var(--text-dim); font-size: .8rem; }
+  #home.dragover { outline: 3px dashed var(--accent); outline-offset: -12px; }
+  #home .gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 16px;
+    width: min(960px, 100%);
+  }
+  #home .gallery figure {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  #home .gallery img { width: 100%; display: block; aspect-ratio: 9/11; object-fit: cover; }
+  #home .gallery figcaption {
+    padding: 10px 12px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: .78rem;
+    letter-spacing: .08em;
+    color: var(--text-dim);
+  }
+
   /* ---- ローディング演出 ---- */
   #loading {
     position: absolute;
@@ -331,6 +396,24 @@
 </style>
 </head>
 <body>
+<div id="home">
+  <div class="hero">
+    <h1 class="logo">HITBOX<span>_</span>MAKER</h1>
+    <p class="tagline">画像を入れるだけで、格ゲー風の判定が付く。</p>
+    <p class="sub">AIがキャラを抜き出して食らい判定を自動生成。解析はぜんぶ端末の中、どこにも送信されません。</p>
+    <div class="cta">
+      <button id="btn-home-open" class="primary big">画像を選んで作る</button>
+      <button id="btn-home-sample" class="big">サンプルで試す</button>
+    </div>
+    <p class="drop-hint">ここに画像をドロップ / <kbd>⌘V</kbd> ペーストでもOK</p>
+  </div>
+  <div class="gallery">
+    <figure><img src="samples/cat.jpg" alt="猫パンチに判定が付いた例" loading="lazy"><figcaption>発生4F 猫パンチ</figcaption></figure>
+    <figure><img src="samples/hamster.jpg" alt="ハムスターのキックに判定が付いた例" loading="lazy"><figcaption>空中回し蹴り</figcaption></figure>
+    <figure><img src="samples/fugu.jpg" alt="フグの水ビームに判定が付いた例" loading="lazy"><figcaption>飛び道具（水）</figcaption></figure>
+  </div>
+</div>
+
 <header>
   <h1>Hitbox<span>_</span>Maker</h1>
   <div class="spacer"></div>
@@ -517,6 +600,7 @@ window.addEventListener('paste', e => {
 });
 
 function loadFile(file) {
+  document.body.classList.add('editing'); // トップ画面→作成画面へ
   lastBlob = file;
   const url = URL.createObjectURL(file);
   const im = new Image();
@@ -876,9 +960,26 @@ shareBtn.onclick = () => {
   });
 };
 
+// ---- トップ画面 ----
+const home = document.getElementById('home');
+document.getElementById('btn-home-open').onclick = () => fileInput.click();
+document.getElementById('btn-home-sample').onclick = () => loadSampleImage();
+home.addEventListener('dragover', e => { e.preventDefault(); home.classList.add('dragover'); });
+home.addEventListener('dragleave', () => home.classList.remove('dragover'));
+home.addEventListener('drop', e => {
+  e.preventDefault();
+  home.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) loadFile(f);
+});
+// ヘッダーのロゴでトップへ戻る（作業内容は保持）
+const headerLogo = document.querySelector('header h1');
+headerLogo.style.cursor = 'pointer';
+headerLogo.title = 'トップへ戻る';
+headerLogo.onclick = () => document.body.classList.remove('editing');
+
 // サンプル画像
-document.getElementById('btn-sample').onclick = e => {
-  e.stopPropagation(); // dropzoneのclick（ファイル選択）を抑止
+function loadSampleImage() {
   const c = document.createElement('canvas');
   c.width = 800; c.height = 600;
   const g = c.getContext('2d');
@@ -891,6 +992,10 @@ document.getElementById('btn-sample').onclick = e => {
   g.fillRect(335, 390, 38, 150);                                // 脚
   g.fillRect(395, 390, 38, 150);
   c.toBlob(b => loadFile(new File([b], 'sample.png', { type: 'image/png' })), 'image/png');
+}
+document.getElementById('btn-sample').onclick = e => {
+  e.stopPropagation(); // dropzoneのclick（ファイル選択）を抑止
+  loadSampleImage();
 };
 
 exportBtn.onclick = () => {
