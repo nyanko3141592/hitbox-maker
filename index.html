@@ -242,24 +242,26 @@
   /* ---- モバイル ---- */
   @media (max-width: 760px) {
     body { overflow: auto; }
-    header { flex-wrap: wrap; gap: 8px; padding: 10px 12px; position: sticky; top: 0; z-index: 20; }
-    header h1 { font-size: .9rem; }
-    header button { padding: 9px 12px; font-size: .85rem; }
+    header { gap: 6px; padding: 8px 10px; position: sticky; top: 0; z-index: 20; }
+    header h1 { font-size: .8rem; letter-spacing: .1em; }
+    header button { padding: 9px 10px; font-size: .85rem; flex: none; }
     main { flex-direction: column; overflow: visible; }
     #stage-wrap {
       flex: none;
-      height: 58vh;
-      min-height: 300px;
-      padding: 10px;
+      height: 52vh;
+      min-height: 260px;
+      padding: 8px;
     }
-    #dropzone { inset: 14px; font-size: .9rem; }
+    #dropzone { inset: 12px; font-size: .85rem; }
     aside {
       width: 100%;
       border-left: none;
       border-top: 1px solid var(--line);
       overflow: visible;
     }
-    aside section { padding: 12px 14px; }
+    aside section { padding: 10px 12px; }
+    .type-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .type-btn { flex-direction: column; gap: 4px; padding: 8px 4px; font-size: .75rem; text-align: center; }
     .type-btn, .box-item button, button { min-height: 42px; } /* タッチターゲット */
     .box-item { padding: 10px; }
     input[type="range"] { height: 32px; }
@@ -271,10 +273,10 @@
 <header>
   <h1>Hitbox<span>_</span>Maker</h1>
   <div class="spacer"></div>
-  <button id="btn-open">画像を開く</button>
-  <button id="btn-clear">全消去</button>
+  <button id="btn-open">開く</button>
+  <button id="btn-clear">消去</button>
   <button id="btn-copy" disabled>コピー</button>
-  <button id="btn-export" class="primary" disabled>PNG書き出し</button>
+  <button id="btn-export" class="primary" disabled>保存</button>
   <input type="file" id="file-input" accept="image/*">
 </header>
 
@@ -291,7 +293,6 @@
 
   <aside>
     <section>
-      <h2>判定タイプ</h2>
       <div class="type-grid" id="type-grid"></div>
     </section>
 
@@ -361,9 +362,9 @@
 
 <script>
 const TYPES = [
-  { id: 'hit',   label: '攻撃判定', color: '#e8394a', key: '1' },
-  { id: 'hurt',  label: '食らい判定', color: '#2e7ce8', key: '2' },
-  { id: 'throw', label: '投げ判定', color: '#b04fe0', key: '3' },
+  { id: 'hit',   label: '攻撃', color: '#e8394a', key: '1' },
+  { id: 'hurt',  label: '食らい', color: '#2e7ce8', key: '2' },
+  { id: 'throw', label: '投げ', color: '#b04fe0', key: '3' },
   { id: 'push',  label: '押し合い', color: '#3dbe7b', key: '4' },
 ];
 
