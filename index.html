@@ -299,9 +299,9 @@
         <output id="ai-grid-out" class="mono">16</output>
       </div>
       <div class="row">
-        <label for="ai-cover">密度</label>
-        <input type="range" id="ai-cover" min="10" max="90" value="35">
-        <output id="ai-cover-out" class="mono">35%</output>
+        <label for="ai-cover">カバー率</label>
+        <input type="range" id="ai-cover" min="50" max="98" value="88">
+        <output id="ai-cover-out" class="mono">88%</output>
       </div>
       <p class="hint" id="ai-status">画像を入れると自動で食らい判定が付きます。初回のみAIモデルをダウンロード。</p>
     </section>
@@ -719,48 +719,70 @@ async function runSegmentation() {
   return { data: alpha, w: canvas.width, h: canvas.height };
 }
 
-// マスク → グリッド被覆率 → 矩形マージ
-function maskToBoxes(mask, gridCount, coverThreshold) {
-  const cell = Math.max(canvas.width, canvas.height) / gridCount;
-  const cols = Math.ceil(canvas.width / cell);
-  const rows = Math.ceil(canvas.height / cell);
-  const grid = [];
+// 2値グリッド中の最大面積内接矩形（ヒストグラム法）
+function largestRect(grid, ww, wh) {
+  const heights = new Int32Array(ww);
+  let best = null;
+  for (let r = 0; r < wh; r++) {
+    for (let c = 0; c < ww; c++) heights[c] = grid[r * ww + c] ? heights[c] + 1 : 0;
+    // 単調スタックで最大長方形
+    const stack = [];
+    for (let c = 0; c <= ww; c++) {
+      const h = c < ww ? heights[c] : 0;
+      let start = c;
+      while (stack.length && stack[stack.length - 1][1] > h) {
+        const [s, sh] = stack.pop();
+        const area = sh * (c - s);
+        if (!best || area > best.area) best = { area, c: s, r: r - sh + 1, w: c - s, h: sh };
+        start = s;
+      }
+      stack.push([start, h]);
+    }
+  }
+  return best;
+}
 
-  for (let r = 0; r < rows; r++) {
-    grid.push([]);
-    for (let c = 0; c < cols; c++) {
-      // セル内のマスク値をサンプリングして被覆率を出す
+// マスク → 最大内接矩形の貪欲切り出し（残余がターゲット未満になるまで）
+function maskToBoxes(mask, gridCount, coverTarget) {
+  const WORK = 128;
+  const maxDim = Math.max(mask.w, mask.h);
+  const ww = Math.max(8, Math.round(mask.w * WORK / maxDim));
+  const wh = Math.max(8, Math.round(mask.h * WORK / maxDim));
+  const cx = mask.w / ww, cy = mask.h / wh;
+
+  // 作業解像度に落とす（セル内アルファ平均で判定）
+  const grid = new Uint8Array(ww * wh);
+  let total = 0;
+  for (let r = 0; r < wh; r++) {
+    for (let c = 0; c < ww; c++) {
       let sum = 0, cnt = 0;
-      const x0 = c * cell, y0 = r * cell;
-      const step = Math.max(1, cell / 6);
-      for (let y = y0; y < Math.min(y0 + cell, mask.h); y += step) {
-        for (let x = x0; x < Math.min(x0 + cell, mask.w); x += step) {
-          const mi = Math.floor(y) * mask.w + Math.floor(x);
-          sum += mask.data[mi] > 127 ? 1 : 0;
+      const y0 = Math.floor(r * cy), y1 = Math.max(y0 + 1, Math.floor((r + 1) * cy));
+      const x0 = Math.floor(c * cx), x1 = Math.max(x0 + 1, Math.floor((c + 1) * cx));
+      const stepY = Math.max(1, (y1 - y0) >> 2), stepX = Math.max(1, (x1 - x0) >> 2);
+      for (let y = y0; y < y1; y += stepY) {
+        for (let x = x0; x < x1; x += stepX) {
+          sum += mask.data[y * mask.w + x];
           cnt++;
         }
       }
-      grid[r].push(cnt > 0 && sum / cnt >= coverThreshold);
+      if (cnt && sum / cnt > 110) { grid[r * ww + c] = 1; total++; }
     }
   }
+  if (!total) return [];
 
-  // 行ランを縦方向にマージして矩形化
+  // 貪欲切り出し: 大きい矩形から順に取り、残余がターゲット未満になったら終了
+  const minCells = Math.max(1, Math.round(WORK / gridCount / 2)); // 粗さ→最小ボックス辺
   const rects = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (!grid[r][c]) continue;
-      let c1 = c;
-      while (c1 + 1 < cols && grid[r][c1 + 1]) c1++;
-      let r1 = r;
-      const rowOk = rr => { for (let cc = c; cc <= c1; cc++) if (!grid[rr][cc]) return false; return true; };
-      while (r1 + 1 < rows && rowOk(r1 + 1)) r1++;
-      for (let rr = r; rr <= r1; rr++) for (let cc = c; cc <= c1; cc++) grid[rr][cc] = false;
-      rects.push({
-        x: c * cell, y: r * cell,
-        w: Math.min((c1 - c + 1) * cell, canvas.width - c * cell),
-        h: Math.min((r1 - r + 1) * cell, canvas.height - r * cell),
-      });
+  let remaining = total;
+  while (remaining / total > 1 - coverTarget && rects.length < 40) {
+    const rc = largestRect(grid, ww, wh);
+    if (!rc || rc.w < minCells || rc.h < minCells) break;
+    for (let r = rc.r; r < rc.r + rc.h; r++) {
+      for (let c = rc.c; c < rc.c + rc.w; c++) {
+        if (grid[r * ww + c]) { grid[r * ww + c] = 0; remaining--; }
+      }
     }
+    rects.push({ x: rc.c * cx, y: rc.r * cy, w: rc.w * cx, h: rc.h * cy });
   }
   return rects;
 }
