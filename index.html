@@ -174,6 +174,27 @@
   }
 
   .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  details summary {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: .72rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+  }
+  details summary:hover { color: var(--text); }
+  details[open] summary { margin-bottom: 6px; }
+  select {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 6px;
+    flex: 1;
+    min-width: 0;
+  }
   .hint { font-size: .75rem; color: var(--text-dim); line-height: 1.6; }
   kbd {
     font-family: ui-monospace, monospace;
@@ -275,43 +296,10 @@
     </section>
 
     <section>
-      <h2>表示</h2>
-      <div class="row">
-        <label for="opacity">塗り</label>
-        <input type="range" id="opacity" min="0" max="100" value="30">
-        <output id="opacity-out" class="mono">30%</output>
-      </div>
-      <div class="row">
-        <label for="stroke">枠線</label>
-        <input type="range" id="stroke" min="1" max="10" value="3">
-        <output id="stroke-out" class="mono">3px</output>
-      </div>
-    </section>
-
-    <section>
-      <h2>AI判定生成</h2>
       <div class="btn-row">
-        <button id="btn-ai" class="primary" disabled>再解析</button>
-        <button id="btn-ai-clear" disabled>AI生成分を消す</button>
-        <button id="btn-mask" disabled>抽出部分を見る</button>
-      </div>
-      <div class="row">
-        <label for="ai-model">モデル</label>
-        <select id="ai-model" style="flex:1; font:inherit; color:var(--text); background:var(--panel-2); border:1px solid var(--line); border-radius:4px; padding:6px;">
-          <option value="isnet_fp16" selected>標準 (isnet_fp16)</option>
-          <option value="isnet">高精度 (isnet)</option>
-          <option value="isnet_quint8">軽量 (isnet_quint8)</option>
-        </select>
-      </div>
-      <div class="row">
-        <label for="ai-grid">粗さ</label>
-        <input type="range" id="ai-grid" min="6" max="40" value="20">
-        <output id="ai-grid-out" class="mono">20</output>
-      </div>
-      <div class="row">
-        <label for="ai-cover">カバー率</label>
-        <input type="range" id="ai-cover" min="50" max="98" value="92">
-        <output id="ai-cover-out" class="mono">92%</output>
+        <button id="btn-ai" class="primary" disabled>AI再解析</button>
+        <button id="btn-ai-clear" disabled>AI分を消す</button>
+        <button id="btn-mask" disabled>抽出を見る</button>
       </div>
       <p class="hint" id="ai-status">画像を入れると自動で食らい判定が付きます。初回のみAIモデルをダウンロード。</p>
     </section>
@@ -322,14 +310,51 @@
     </section>
 
     <section>
-      <h2>操作</h2>
-      <p class="hint">
-        ドラッグ … 新規ボックス<br>
-        ボックス内ドラッグ … 移動<br>
-        角ハンドル … リサイズ<br>
-        <kbd>Delete</kbd> … 選択を削除<br>
-        <kbd>1</kbd>–<kbd>4</kbd> … タイプ切替
-      </p>
+      <details>
+        <summary>詳細設定</summary>
+        <div class="row">
+          <label for="opacity">塗り</label>
+          <input type="range" id="opacity" min="0" max="100" value="30">
+          <output id="opacity-out" class="mono">30%</output>
+        </div>
+        <div class="row">
+          <label for="stroke">枠線</label>
+          <input type="range" id="stroke" min="1" max="10" value="3">
+          <output id="stroke-out" class="mono">3px</output>
+        </div>
+        <div class="row">
+          <label for="ai-grid">粗さ</label>
+          <input type="range" id="ai-grid" min="6" max="40" value="20">
+          <output id="ai-grid-out" class="mono">20</output>
+        </div>
+        <div class="row">
+          <label for="ai-cover">カバー率</label>
+          <input type="range" id="ai-cover" min="50" max="98" value="92">
+          <output id="ai-cover-out" class="mono">92%</output>
+        </div>
+        <div class="row">
+          <label for="ai-model">モデル</label>
+          <select id="ai-model">
+            <option value="isnet_fp16" selected>標準 (isnet_fp16)</option>
+            <option value="isnet">高精度 (isnet)</option>
+            <option value="isnet_quint8">軽量 (isnet_quint8)</option>
+          </select>
+        </div>
+      </details>
+    </section>
+
+    <section>
+      <details>
+        <summary>操作ヘルプ</summary>
+        <p class="hint">
+          ドラッグ … 新規ボックス<br>
+          ボックス内ドラッグ … 移動<br>
+          角ハンドル … リサイズ<br>
+          <kbd>Delete</kbd> … 選択を削除<br>
+          <kbd>⌘Z</kbd> … 取り消し<br>
+          <kbd>1</kbd>–<kbd>4</kbd> … タイプ切替
+        </p>
+      </details>
     </section>
   </aside>
 </main>
