@@ -254,6 +254,52 @@
     #flash.go { animation: none; opacity: 1; transition: opacity .2s; }
   }
 
+  /* ---- ローディング演出 ---- */
+  #loading {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 22px;
+    background: #101318cc;
+    z-index: 9;
+    overflow: hidden;
+  }
+  #loading.on { display: flex; }
+  #loading .scanline {
+    position: absolute;
+    left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    box-shadow: 0 0 18px var(--accent);
+    animation: scan 1.6s ease-in-out infinite alternate;
+  }
+  @keyframes scan { from { top: 6%; } to { top: 94%; } }
+  #loading .duel { display: flex; align-items: center; gap: 10px; }
+  #loading .duel .fighter {
+    width: 30px; height: 30px;
+    border: 3px solid;
+    border-radius: 3px;
+  }
+  #loading .duel .hit  { border-color: var(--hit);  background: #e8394a4d; animation: lunge-r 0.9s ease-in-out infinite; }
+  #loading .duel .hurt { border-color: var(--hurt); background: #2e7ce84d; animation: lunge-l 0.9s ease-in-out infinite; }
+  @keyframes lunge-r { 0%,100% { transform: translateX(-14px) rotate(-6deg); } 50% { transform: translateX(6px) rotate(4deg); } }
+  @keyframes lunge-l { 0%,100% { transform: translateX(14px) rotate(6deg); } 50% { transform: translateX(-6px) rotate(-4deg); } }
+  #loading .msg {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: .95rem;
+    letter-spacing: .1em;
+    color: var(--accent);
+    text-shadow: 0 0 12px #f2c14e66;
+  }
+  #loading .msg::after { content: '…'; animation: dots 1.2s steps(4) infinite; }
+  @keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
+  @media (prefers-reduced-motion: reduce) {
+    #loading .scanline, #loading .duel .fighter { animation: none; }
+  }
+
   /* ---- モバイル ---- */
   @media (max-width: 760px) {
     body { overflow: auto; }
@@ -305,6 +351,14 @@
       <button id="btn-sample">サンプル画像で試す</button>
     </div>
     <div id="flash" aria-hidden="true"><span>判定付与!!</span></div>
+    <div id="loading" aria-hidden="true">
+      <div class="scanline"></div>
+      <div class="duel">
+        <div class="fighter hurt"></div>
+        <div class="fighter hit"></div>
+      </div>
+      <div class="msg" id="loading-msg">解析中</div>
+    </div>
   </div>
 
   <aside>
@@ -315,6 +369,7 @@
     <section>
       <div class="btn-row">
         <button id="btn-ai" class="primary" disabled>AI再解析</button>
+        <button id="btn-mask" disabled>抽出を見る</button>
       </div>
       <div class="row">
         <label for="ai-grid">粗さ</label>
@@ -336,7 +391,6 @@
         <summary>詳細設定</summary>
         <div class="btn-row" style="margin-bottom:4px;">
           <button id="btn-ai-clear" disabled>AI分を消す</button>
-          <button id="btn-mask" disabled>抽出を見る</button>
         </div>
         <div class="row">
           <label for="opacity">塗り</label>
@@ -357,11 +411,6 @@
           <label for="wm-toggle">透かし</label>
           <input type="checkbox" id="wm-toggle" checked style="width:20px;height:20px;accent-color:var(--accent);">
           <span class="hint" style="flex:1">書き出しにツール名を入れる</span>
-        </div>
-        <div class="row">
-          <label for="hit-toggle">攻撃推測</label>
-          <input type="checkbox" id="hit-toggle" checked style="width:20px;height:20px;accent-color:var(--accent);">
-          <span class="hint" style="flex:1">突端に攻撃判定を自動配置</span>
         </div>
         <div class="row">
           <label for="ai-model">モデル</label>
@@ -875,7 +924,10 @@ aiCoverEl.oninput = () => {
   if (maskCache) regenerateBoxes();
 };
 
-function setAiStatus(msg) { aiStatus.textContent = msg; }
+function setAiStatus(msg) {
+  aiStatus.textContent = msg;
+  document.getElementById('loading-msg').textContent = msg.replace(/[…。].*$/, '');
+}
 
 async function getRemover() {
   if (!removeBackgroundFn) {
@@ -1026,49 +1078,14 @@ function maskToBoxes(mask, gridCount, coverTarget) {
   return rects;
 }
 
-// シルエット重心から一番「突き出た」先端を攻撃判定として推測
-function suggestAttackBox() {
-  const { data, w, h } = maskCache;
-  const stride = 4;
-  let sx = 0, sy = 0, n = 0;
-  for (let y = 0; y < h; y += stride) {
-    for (let x = 0; x < w; x += stride) {
-      if (data[y * w + x] > 127) { sx += x; sy += y; n++; }
-    }
-  }
-  if (!n) return null;
-  const cx = sx / n, cy = sy / n;
-  // 横方向の突出を重めに評価（攻撃は横に伸びがち）
-  let best = null, bestD = -1;
-  for (let y = 0; y < h; y += stride) {
-    for (let x = 0; x < w; x += stride) {
-      if (data[y * w + x] <= 127) continue;
-      const d = ((x - cx) * 1.5) ** 2 + ((y - cy) * 0.8) ** 2;
-      if (d > bestD) { bestD = d; best = { x, y }; }
-    }
-  }
-  if (!best) return null;
-  const s = Math.max(w, h) * 0.13;
-  return {
-    x: Math.min(Math.max(best.x - s / 2, 0), w - s),
-    y: Math.min(Math.max(best.y - s / 2, 0), h - s),
-    w: s, h: s,
-  };
-}
-
 function regenerateBoxes() {
   snapshot();
   boxes = boxes.filter(b => !b.aiGenerated);
   const rects = maskToBoxes(maskCache, +aiGridEl.value, aiCoverEl.value / 100);
   for (const rc of rects) boxes.push({ id: nextId++, type: 'hurt', aiGenerated: true, ...rc });
-  if (document.getElementById('hit-toggle').checked) {
-    const atk = suggestAttackBox();
-    if (atk) boxes.push({ id: nextId++, type: 'hit', aiGenerated: true, ...atk });
-  }
   selectedId = null;
-  const hasAtk = boxes.some(b => b.aiGenerated && b.type === 'hit');
-  aiClearBtn.disabled = !boxes.some(b => b.aiGenerated);
-  setAiStatus(`食らい判定 ${rects.length} 個${hasAtk ? ' + 攻撃判定を推測' : ''}。粗さで再調整できます。`);
+  aiClearBtn.disabled = rects.length === 0;
+  setAiStatus(`食らい判定 ${rects.length} 個を生成。粗さで再調整できます。`);
   render();
 }
 
@@ -1142,6 +1159,7 @@ maskBtn.onclick = () => {
 
 async function autoAnnotate() {
   aiBtn.disabled = true;
+  document.getElementById('loading').classList.add('on');
   startFunMessages();
   try {
     maskCache = await runSegmentation();
@@ -1156,6 +1174,7 @@ async function autoAnnotate() {
     setAiStatus('エラー: ' + err.message + ' — 「再解析」で再試行できます。');
   } finally {
     aiBtn.disabled = false;
+    document.getElementById('loading').classList.remove('on');
   }
 }
 
