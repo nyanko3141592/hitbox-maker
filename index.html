@@ -252,6 +252,7 @@
   <div class="spacer"></div>
   <button id="btn-open">画像を開く</button>
   <button id="btn-clear">全消去</button>
+  <button id="btn-copy" disabled>コピー</button>
   <button id="btn-export" class="primary" disabled>PNG書き出し</button>
   <input type="file" id="file-input" accept="image/*">
 </header>
@@ -262,6 +263,7 @@
     <div id="dropzone">
       <strong>画像を入れると勝手に食らい判定が付きます</strong>
       <span>タップして選択 / ドラッグ&ドロップ / <kbd>⌘V</kbd> ペースト<br>解析はぜんぶ端末の中。どこにも送信されません</span>
+      <button id="btn-sample">サンプル画像で試す</button>
     </div>
     <div id="flash" aria-hidden="true"><span>判定付与!!</span></div>
   </div>
@@ -294,14 +296,22 @@
         <button id="btn-mask" disabled>抽出部分を見る</button>
       </div>
       <div class="row">
+        <label for="ai-model">モデル</label>
+        <select id="ai-model" style="flex:1; font:inherit; color:var(--text); background:var(--panel-2); border:1px solid var(--line); border-radius:4px; padding:6px;">
+          <option value="isnet_fp16" selected>標準 (isnet_fp16)</option>
+          <option value="isnet">高精度 (isnet)</option>
+          <option value="isnet_quint8">軽量 (isnet_quint8)</option>
+        </select>
+      </div>
+      <div class="row">
         <label for="ai-grid">粗さ</label>
-        <input type="range" id="ai-grid" min="6" max="40" value="16">
-        <output id="ai-grid-out" class="mono">16</output>
+        <input type="range" id="ai-grid" min="6" max="40" value="20">
+        <output id="ai-grid-out" class="mono">20</output>
       </div>
       <div class="row">
         <label for="ai-cover">カバー率</label>
-        <input type="range" id="ai-cover" min="50" max="98" value="88">
-        <output id="ai-cover-out" class="mono">88%</output>
+        <input type="range" id="ai-cover" min="50" max="98" value="92">
+        <output id="ai-cover-out" class="mono">92%</output>
       </div>
       <p class="hint" id="ai-status">画像を入れると自動で食らい判定が付きます。初回のみAIモデルをダウンロード。</p>
     </section>
@@ -413,6 +423,8 @@ function loadFile(file) {
     selectedId = null;
     dropzone.classList.add('hidden');
     exportBtn.disabled = false;
+    document.getElementById('btn-copy').disabled = false;
+    history.length = 0;
     aiBtn.disabled = false;
     aiClearBtn.disabled = true;
     maskCache = null;
@@ -460,12 +472,33 @@ function hitBox(p) {
   return null;
 }
 
+// ---- Undo ----
+const history = [];
+function snapshot() {
+  history.push(JSON.stringify(boxes));
+  if (history.length > 50) history.shift();
+}
+function undo() {
+  // 変化のないスナップショット（選択クリックだけ等）はスキップ
+  while (history.length) {
+    const s = history.pop();
+    if (s !== JSON.stringify(boxes)) {
+      boxes = JSON.parse(s);
+      selectedId = null;
+      aiClearBtn.disabled = !boxes.some(b => b.aiGenerated);
+      render();
+      return;
+    }
+  }
+}
+
 // ---- ドラッグ操作 ----
 let drag = null; // {mode:'draw'|'move'|'resize', ...}
 
 canvas.addEventListener('pointerdown', e => {
   if (!img) return;
   canvas.setPointerCapture(e.pointerId);
+  snapshot();
   const p = toImageCoords(e);
   const sel = boxes.find(b => b.id === selectedId);
 
@@ -529,8 +562,14 @@ canvas.addEventListener('pointerup', () => {
 // ---- キーボード ----
 window.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+    undo();
+    e.preventDefault();
+    return;
+  }
   if (e.key === 'Delete' || e.key === 'Backspace') {
     if (selectedId != null) {
+      snapshot();
       boxes = boxes.filter(b => b.id !== selectedId);
       selectedId = null;
       render();
@@ -590,9 +629,7 @@ function drawScene(c, uiLayer) {
     c.drawImage(o, 0, 0);
   }
   if (uiLayer && showMask && maskOverlay) {
-    c.globalAlpha = 0.55;
-    c.drawImage(maskOverlay, 0, 0);
-    c.globalAlpha = 1;
+    c.drawImage(maskOverlay, 0, 0); // 透過はoverlay側に焼き込み済み
   }
   if (uiLayer && selectedId != null) {
     const b = boxes.find(x => x.id === selectedId);
@@ -633,6 +670,7 @@ function renderList() {
     del.title = '削除';
     del.onclick = ev => {
       ev.stopPropagation();
+      snapshot();
       boxes = boxes.filter(x => x.id !== b.id);
       if (selectedId === b.id) selectedId = null;
       render();
@@ -646,9 +684,45 @@ function renderList() {
 // ---- 全消去 / 書き出し ----
 document.getElementById('btn-clear').onclick = () => {
   if (boxes.length && !confirm('すべての判定ボックスを削除します。よろしいですか？')) return;
+  snapshot();
   boxes = [];
   selectedId = null;
   render();
+};
+
+// PNG をクリップボードにコピー
+const copyBtn = document.getElementById('btn-copy');
+copyBtn.onclick = () => {
+  const out = document.createElement('canvas');
+  out.width = canvas.width;
+  out.height = canvas.height;
+  drawScene(out.getContext('2d'), false);
+  out.toBlob(async blob => {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      copyBtn.textContent = 'コピーした!';
+    } catch {
+      copyBtn.textContent = 'コピー不可';
+    }
+    setTimeout(() => { copyBtn.textContent = 'コピー'; }, 1500);
+  });
+};
+
+// サンプル画像
+document.getElementById('btn-sample').onclick = e => {
+  e.stopPropagation(); // dropzoneのclick（ファイル選択）を抑止
+  const c = document.createElement('canvas');
+  c.width = 800; c.height = 600;
+  const g = c.getContext('2d');
+  g.fillStyle = '#e8d8c8'; g.fillRect(0, 0, 800, 600);
+  g.fillStyle = '#2a3245';
+  g.beginPath(); g.arc(380, 150, 55, 0, 7); g.fill();          // 頭
+  g.fillRect(325, 200, 110, 190);                               // 胴
+  g.fillRect(435, 225, 180, 42);                                // 突き出した腕
+  g.fillRect(285, 225, 40, 120);                                // 後ろ腕
+  g.fillRect(335, 390, 38, 150);                                // 脚
+  g.fillRect(395, 390, 38, 150);
+  c.toBlob(b => loadFile(new File([b], 'sample.png', { type: 'image/png' })), 'image/png');
 };
 
 exportBtn.onclick = () => {
@@ -700,6 +774,7 @@ async function getRemover() {
 async function runSegmentation() {
   const removeBg = await getRemover();
   const fgBlob = await removeBg(lastBlob, {
+    model: document.getElementById('ai-model').value,
     progress: (key, current, total) => {
       if (key.startsWith('fetch') && total) {
         setAiStatus(`モデルをダウンロード中… ${Math.round(current / total * 100)}% (初回のみ)`);
@@ -716,7 +791,56 @@ async function runSegmentation() {
   const n = canvas.width * canvas.height;
   const alpha = new Uint8ClampedArray(n);
   for (let i = 0; i < n; i++) alpha[i] = data[i * 4 + 3];
+  keepLargestComponent(alpha, canvas.width, canvas.height);
   return { data: alpha, w: canvas.width, h: canvas.height };
+}
+
+// 最大連結成分だけ残す（飛び地除去）。ラベリングは縮小解像度で行いセル単位で反映
+function keepLargestComponent(alpha, w, h) {
+  const L = 256;
+  const maxDim = Math.max(w, h);
+  const lw = Math.max(8, Math.round(w * L / maxDim));
+  const lh = Math.max(8, Math.round(h * L / maxDim));
+  const cx = w / lw, cy = h / lh;
+  const bin = new Uint8Array(lw * lh);
+  for (let r = 0; r < lh; r++) {
+    for (let c = 0; c < lw; c++) {
+      // セル中央付近をサンプル
+      const x = Math.min(w - 1, Math.floor((c + 0.5) * cx));
+      const y = Math.min(h - 1, Math.floor((r + 0.5) * cy));
+      if (alpha[y * w + x] > 127) bin[r * lw + c] = 1;
+    }
+  }
+  // BFSでラベリングして最大成分を探す
+  const label = new Int32Array(lw * lh).fill(-1);
+  let bestLabel = -1, bestSize = 0, cur = 0;
+  const queue = new Int32Array(lw * lh);
+  for (let i = 0; i < lw * lh; i++) {
+    if (!bin[i] || label[i] >= 0) continue;
+    let head = 0, tail = 0, size = 0;
+    queue[tail++] = i; label[i] = cur;
+    while (head < tail) {
+      const p = queue[head++]; size++;
+      const pr = (p / lw) | 0, pc = p % lw;
+      for (const [dr, dc] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        const nr = pr + dr, nc = pc + dc;
+        if (nr < 0 || nr >= lh || nc < 0 || nc >= lw) continue;
+        const np = nr * lw + nc;
+        if (bin[np] && label[np] < 0) { label[np] = cur; queue[tail++] = np; }
+      }
+    }
+    if (size > bestSize) { bestSize = size; bestLabel = cur; }
+    cur++;
+  }
+  if (bestLabel < 0) return;
+  // 最大成分以外のセルはアルファを0に
+  for (let y = 0; y < h; y++) {
+    const r = Math.min(lh - 1, Math.floor(y / cy));
+    for (let x = 0; x < w; x++) {
+      const c = Math.min(lw - 1, Math.floor(x / cx));
+      if (label[r * lw + c] !== bestLabel) alpha[y * w + x] = 0;
+    }
+  }
 }
 
 // 2値グリッド中の最大面積内接矩形（ヒストグラム法）
@@ -788,6 +912,7 @@ function maskToBoxes(mask, gridCount, coverTarget) {
 }
 
 function regenerateBoxes() {
+  snapshot();
   boxes = boxes.filter(b => !b.aiGenerated);
   const rects = maskToBoxes(maskCache, +aiGridEl.value, aiCoverEl.value / 100);
   for (const rc of rects) boxes.push({ id: nextId++, type: 'hurt', aiGenerated: true, ...rc });
@@ -820,17 +945,41 @@ function playFlash() {
 }
 
 function buildMaskOverlay() {
-  const m = document.createElement('canvas');
-  m.width = maskCache.w; m.height = maskCache.h;
-  const g = m.getContext('2d');
-  const id = g.createImageData(maskCache.w, maskCache.h);
+  const w = maskCache.w, h = maskCache.h;
+  // シルエット（アクセント色、マスクのアルファそのまま）
+  const s = document.createElement('canvas');
+  s.width = w; s.height = h;
+  const sg = s.getContext('2d');
+  const id = sg.createImageData(w, h);
   for (let i = 0; i < maskCache.data.length; i++) {
     id.data[i * 4]     = 0xf2; // accent #f2c14e
     id.data[i * 4 + 1] = 0xc1;
     id.data[i * 4 + 2] = 0x4e;
-    id.data[i * 4 + 3] = maskCache.data[i];
+    id.data[i * 4 + 3] = maskCache.data[i] > 127 ? 255 : 0;
   }
-  g.putImageData(id, 0, 0);
+  sg.putImageData(id, 0, 0);
+  // 太い輪郭 = S - erode(S)
+  const t = Math.max(3, Math.round(Math.max(w, h) / 160));
+  const e = document.createElement('canvas');
+  e.width = w; e.height = h;
+  const ec = e.getContext('2d');
+  ec.drawImage(s, 0, 0);
+  ec.globalCompositeOperation = 'destination-in';
+  for (const [dx, dy] of [[t,0],[-t,0],[0,t],[0,-t],[t,t],[t,-t],[-t,t],[-t,-t]]) ec.drawImage(s, dx, dy);
+  const ring = document.createElement('canvas');
+  ring.width = w; ring.height = h;
+  const rc = ring.getContext('2d');
+  rc.drawImage(s, 0, 0);
+  rc.globalCompositeOperation = 'destination-out';
+  rc.drawImage(e, 0, 0);
+  // 合成: 薄い塗り + 不透明の太い輪郭
+  const m = document.createElement('canvas');
+  m.width = w; m.height = h;
+  const g = m.getContext('2d');
+  g.globalAlpha = 0.15;
+  g.drawImage(s, 0, 0);
+  g.globalAlpha = 1;
+  g.drawImage(ring, 0, 0);
   return m;
 }
 
@@ -861,11 +1010,13 @@ async function autoAnnotate() {
 }
 
 aiBtn.onclick = () => { if (img) autoAnnotate(); };
+document.getElementById('ai-model').onchange = () => { if (img) autoAnnotate(); };
 
 // ページ表示直後からエンジンを裏で先読み（ドロップ即解析のため）
 setTimeout(() => { getRemover().catch(() => {}); }, 500);
 
 aiClearBtn.onclick = () => {
+  snapshot();
   boxes = boxes.filter(b => !b.aiGenerated);
   aiClearBtn.disabled = true;
   setAiStatus('AI生成分を削除しました。');
