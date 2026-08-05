@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>判定メーカー — HITBOX VIEWER</title>
+<style>
+  :root {
+    --bg: #101318;
+    --panel: #191f28;
+    --panel-2: #212936;
+    --line: #2c3646;
+    --text: #e8ecf2;
+    --text-dim: #8b96a5;
+    --hit: #e8394a;
+    --hurt: #2e7ce8;
+    --throw: #b04fe0;
+    --push: #3dbe7b;
+    --accent: #f2c14e;
+    font-size: 15px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Hiragino Sans", sans-serif;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    flex: none;
+  }
+  header h1 {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 1rem;
+    letter-spacing: .18em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  header h1 span { color: var(--text-dim); font-weight: 400; }
+  header .spacer { flex: 1; }
+
+  button {
+    font: inherit;
+    color: var(--text);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--text-dim); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button.primary { background: var(--accent); color: #14100a; border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.08); }
+  button:disabled { opacity: .4; cursor: default; }
+
+  main { flex: 1; display: flex; min-height: 0; }
+
+  #stage-wrap {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    min-width: 0;
+    background:
+      repeating-linear-gradient(0deg, transparent 0 39px, #ffffff06 39px 40px),
+      repeating-linear-gradient(90deg, transparent 0 39px, #ffffff06 39px 40px),
+      var(--bg);
+  }
+  #stage {
+    max-width: 100%;
+    max-height: 100%;
+    box-shadow: 0 8px 40px #0009;
+    cursor: crosshair;
+    touch-action: none;
+  }
+  #dropzone {
+    position: absolute;
+    inset: 24px;
+    border: 2px dashed var(--line);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 20px;
+  }
+  #dropzone.hidden { display: none; }
+  #dropzone strong { color: var(--text); font-size: 1.1rem; }
+  #dropzone.dragover { border-color: var(--accent); color: var(--accent); }
+
+  aside {
+    width: 300px;
+    flex: none;
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  aside section { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  aside h2 {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: .72rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+  }
+
+  .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .type-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    text-align: left;
+    font-size: .85rem;
+  }
+  .type-btn .swatch {
+    width: 14px; height: 14px;
+    border-radius: 2px;
+    border: 2px solid;
+    flex: none;
+  }
+  .type-btn.active { border-color: var(--accent); background: #f2c14e14; }
+
+  .row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .row label { font-size: .8rem; color: var(--text-dim); flex: none; width: 5.5em; }
+  input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .row output { font-size: .8rem; width: 3em; text-align: right; }
+
+  #box-list { display: flex; flex-direction: column; gap: 6px; }
+  #box-list:empty::after {
+    content: "まだ判定がありません。画像の上をドラッグして追加。";
+    color: var(--text-dim);
+    font-size: .8rem;
+  }
+  .box-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--panel-2);
+    cursor: pointer;
+    font-size: .8rem;
+  }
+  .box-item.selected { border-color: var(--accent); }
+  .box-item .swatch { width: 12px; height: 12px; border-radius: 2px; border: 2px solid; flex: none; }
+  .box-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .box-item .dims { color: var(--text-dim); }
+  .box-item button {
+    padding: 2px 7px;
+    font-size: .75rem;
+    line-height: 1.2;
+  }
+
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .hint { font-size: .75rem; color: var(--text-dim); line-height: 1.6; }
+  kbd {
+    font-family: ui-monospace, monospace;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 0 5px;
+    font-size: .85em;
+  }
+  input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Hitbox<span>_</span>Maker</h1>
+  <div class="spacer"></div>
+  <button id="btn-open">画像を開く</button>
+  <button id="btn-clear">全消去</button>
+  <button id="btn-export" class="primary" disabled>PNG書き出し</button>
+  <input type="file" id="file-input" accept="image/*">
+</header>
+
+<main>
+  <div id="stage-wrap">
+    <canvas id="stage" width="800" height="600"></canvas>
+    <div id="dropzone">
+      <strong>画像をここにドロップ</strong>
+      <span>またはクリックして選択 / <kbd>⌘V</kbd> でペースト<br>画像はブラウザ内だけで処理され、どこにも送信されません</span>
+    </div>
+  </div>
+
+  <aside>
+    <section>
+      <h2>判定タイプ</h2>
+      <div class="type-grid" id="type-grid"></div>
+    </section>
+
+    <section>
+      <h2>表示</h2>
+      <div class="row">
+        <label for="opacity">塗り</label>
+        <input type="range" id="opacity" min="0" max="100" value="30">
+        <output id="opacity-out" class="mono">30%</output>
+      </div>
+      <div class="row">
+        <label for="stroke">枠線</label>
+        <input type="range" id="stroke" min="1" max="10" value="3">
+        <output id="stroke-out" class="mono">3px</output>
+      </div>
+    </section>
+
+    <section style="flex:1">
+      <h2>レイヤー</h2>
+      <div id="box-list"></div>
+    </section>
+
+    <section>
+      <h2>操作</h2>
+      <p class="hint">
+        ドラッグ … 新規ボックス<br>
+        ボックス内ドラッグ … 移動<br>
+        角ハンドル … リサイズ<br>
+        <kbd>Delete</kbd> … 選択を削除<br>
+        <kbd>1</kbd>–<kbd>4</kbd> … タイプ切替
+      </p>
+    </section>
+  </aside>
+</main>
+
+<script>
+const TYPES = [
+  { id: 'hit',   label: '攻撃判定', color: '#e8394a', key: '1' },
+  { id: 'hurt',  label: '食らい判定', color: '#2e7ce8', key: '2' },
+  { id: 'throw', label: '投げ判定', color: '#b04fe0', key: '3' },
+  { id: 'push',  label: '押し合い', color: '#3dbe7b', key: '4' },
+];
+
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+const dropzone = document.getElementById('dropzone');
+const stageWrap = document.getElementById('stage-wrap');
+const fileInput = document.getElementById('file-input');
+const boxList = document.getElementById('box-list');
+const exportBtn = document.getElementById('btn-export');
+
+let img = null;
+let boxes = [];          // {id, type, x, y, w, h} 画像ピクセル座標
+let nextId = 1;
+let currentType = 'hit';
+let selectedId = null;
+let fillOpacity = 0.30;
+let strokeWidth = 3;
+
+// ---- 判定タイプUI ----
+const typeGrid = document.getElementById('type-grid');
+for (const t of TYPES) {
+  const b = document.createElement('button');
+  b.className = 'type-btn' + (t.id === currentType ? ' active' : '');
+  b.dataset.type = t.id;
+  b.innerHTML = `<span class="swatch" style="border-color:${t.color};background:${t.color}44"></span>${t.label}`;
+  b.onclick = () => setType(t.id);
+  typeGrid.appendChild(b);
+}
+function setType(id) {
+  currentType = id;
+  for (const b of typeGrid.children) b.classList.toggle('active', b.dataset.type === id);
+  if (selectedId != null) {
+    const box = boxes.find(b => b.id === selectedId);
+    if (box) { box.type = id; render(); }
+  }
+}
+function typeOf(id) { return TYPES.find(t => t.id === id); }
+
+// ---- スライダー ----
+const opacityEl = document.getElementById('opacity');
+const strokeEl = document.getElementById('stroke');
+opacityEl.oninput = () => {
+  fillOpacity = opacityEl.value / 100;
+  document.getElementById('opacity-out').textContent = opacityEl.value + '%';
+  render();
+};
+strokeEl.oninput = () => {
+  strokeWidth = +strokeEl.value;
+  document.getElementById('stroke-out').textContent = strokeEl.value + 'px';
+  render();
+};
+
+// ---- 画像読み込み ----
+document.getElementById('btn-open').onclick = () => fileInput.click();
+dropzone.onclick = () => fileInput.click();
+fileInput.onchange = () => { if (fileInput.files[0]) loadFile(fileInput.files[0]); fileInput.value = ''; };
+
+stageWrap.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+stageWrap.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+stageWrap.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) loadFile(f);
+});
+window.addEventListener('paste', e => {
+  for (const item of e.clipboardData.items) {
+    if (item.type.startsWith('image/')) { loadFile(item.getAsFile()); break; }
+  }
+});
+
+function loadFile(file) {
+  const url = URL.createObjectURL(file);
+  const im = new Image();
+  im.onload = () => {
+    img = im;
+    canvas.width = im.naturalWidth;
+    canvas.height = im.naturalHeight;
+    boxes = [];
+    selectedId = null;
+    dropzone.classList.add('hidden');
+    exportBtn.disabled = false;
+    render();
+    URL.revokeObjectURL(url);
+  };
+  im.src = url;
+}
+
+// ---- 座標変換 ----
+function toImageCoords(e) {
+  const r = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - r.left) * (canvas.width / r.width),
+    y: (e.clientY - r.top) * (canvas.height / r.height),
+  };
+}
+function handleSize() {
+  const r = canvas.getBoundingClientRect();
+  return 10 * (canvas.width / r.width); // 表示上10px相当
+}
+
+// ---- ヒットテスト ----
+function hitHandle(box, p) {
+  const hs = handleSize();
+  const corners = [
+    ['nw', box.x, box.y], ['ne', box.x + box.w, box.y],
+    ['sw', box.x, box.y + box.h], ['se', box.x + box.w, box.y + box.h],
+  ];
+  for (const [name, cx, cy] of corners) {
+    if (Math.abs(p.x - cx) <= hs && Math.abs(p.y - cy) <= hs) return name;
+  }
+  return null;
+}
+function hitBox(p) {
+  for (let i = boxes.length - 1; i >= 0; i--) {
+    const b = boxes[i];
+    if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) return b;
+  }
+  return null;
+}
+
+// ---- ドラッグ操作 ----
+let drag = null; // {mode:'draw'|'move'|'resize', ...}
+
+canvas.addEventListener('pointerdown', e => {
+  if (!img) return;
+  canvas.setPointerCapture(e.pointerId);
+  const p = toImageCoords(e);
+  const sel = boxes.find(b => b.id === selectedId);
+
+  if (sel) {
+    const h = hitHandle(sel, p);
+    if (h) { drag = { mode: 'resize', box: sel, handle: h }; return; }
+  }
+  const target = hitBox(p);
+  if (target) {
+    selectedId = target.id;
+    drag = { mode: 'move', box: target, ox: p.x - target.x, oy: p.y - target.y };
+    render();
+    return;
+  }
+  // 新規描画
+  const box = { id: nextId++, type: currentType, x: p.x, y: p.y, w: 0, h: 0 };
+  boxes.push(box);
+  selectedId = box.id;
+  drag = { mode: 'draw', box, sx: p.x, sy: p.y };
+  render();
+});
+
+canvas.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const p = toImageCoords(e);
+  const b = drag.box;
+  if (drag.mode === 'draw') {
+    b.x = Math.min(drag.sx, p.x);
+    b.y = Math.min(drag.sy, p.y);
+    b.w = Math.abs(p.x - drag.sx);
+    b.h = Math.abs(p.y - drag.sy);
+  } else if (drag.mode === 'move') {
+    b.x = p.x - drag.ox;
+    b.y = p.y - drag.oy;
+  } else if (drag.mode === 'resize') {
+    const right = b.x + b.w, bottom = b.y + b.h;
+    if (drag.handle.includes('w')) { b.w = right - p.x; b.x = p.x; }
+    if (drag.handle.includes('e')) { b.w = p.x - b.x; }
+    if (drag.handle.includes('n')) { b.h = bottom - p.y; b.y = p.y; }
+    if (drag.handle.includes('s')) { b.h = p.y - b.y; }
+  }
+  render();
+});
+
+canvas.addEventListener('pointerup', () => {
+  if (drag) {
+    const b = drag.box;
+    // 反転を正規化
+    if (b.w < 0) { b.x += b.w; b.w = -b.w; }
+    if (b.h < 0) { b.y += b.h; b.h = -b.h; }
+    // 小さすぎる新規ボックスは破棄
+    if (drag.mode === 'draw' && (b.w < 4 || b.h < 4)) {
+      boxes = boxes.filter(x => x.id !== b.id);
+      selectedId = null;
+    }
+    drag = null;
+    render();
+  }
+});
+
+// ---- キーボード ----
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    if (selectedId != null) {
+      boxes = boxes.filter(b => b.id !== selectedId);
+      selectedId = null;
+      render();
+      e.preventDefault();
+    }
+  }
+  const t = TYPES.find(t => t.key === e.key);
+  if (t) setType(t.id);
+});
+
+// ---- 描画 ----
+function drawScene(c, uiLayer) {
+  c.clearRect(0, 0, canvas.width, canvas.height);
+  if (img) c.drawImage(img, 0, 0);
+  const scale = canvas.width / canvas.getBoundingClientRect().width || 1;
+  const sw = strokeWidth * scale;
+  for (const b of boxes) {
+    const t = typeOf(b.type);
+    c.fillStyle = t.color + Math.round(fillOpacity * 255).toString(16).padStart(2, '0');
+    c.fillRect(b.x, b.y, b.w, b.h);
+    c.lineWidth = sw;
+    c.strokeStyle = t.color;
+    c.strokeRect(b.x, b.y, b.w, b.h);
+  }
+  if (uiLayer && selectedId != null) {
+    const b = boxes.find(x => x.id === selectedId);
+    if (b) {
+      c.setLineDash([6 * scale, 4 * scale]);
+      c.lineWidth = 1.5 * scale;
+      c.strokeStyle = '#f2c14e';
+      c.strokeRect(b.x - 3 * scale, b.y - 3 * scale, b.w + 6 * scale, b.h + 6 * scale);
+      c.setLineDash([]);
+      const hs = 5 * scale;
+      c.fillStyle = '#f2c14e';
+      for (const [cx, cy] of [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]]) {
+        c.fillRect(cx - hs, cy - hs, hs * 2, hs * 2);
+      }
+    }
+  }
+}
+
+function render() {
+  drawScene(ctx, true);
+  renderList();
+}
+
+function renderList() {
+  boxList.innerHTML = '';
+  const counts = {};
+  for (const b of boxes) {
+    const t = typeOf(b.type);
+    counts[b.type] = (counts[b.type] || 0) + 1;
+    const item = document.createElement('div');
+    item.className = 'box-item' + (b.id === selectedId ? ' selected' : '');
+    item.innerHTML =
+      `<span class="swatch" style="border-color:${t.color};background:${t.color}44"></span>` +
+      `<span class="name">${t.label} ${counts[b.type]}</span>` +
+      `<span class="dims mono">${Math.round(b.w)}×${Math.round(b.h)}</span>`;
+    const del = document.createElement('button');
+    del.textContent = '×';
+    del.title = '削除';
+    del.onclick = ev => {
+      ev.stopPropagation();
+      boxes = boxes.filter(x => x.id !== b.id);
+      if (selectedId === b.id) selectedId = null;
+      render();
+    };
+    item.appendChild(del);
+    item.onclick = () => { selectedId = b.id; render(); };
+    boxList.appendChild(item);
+  }
+}
+
+// ---- 全消去 / 書き出し ----
+document.getElementById('btn-clear').onclick = () => {
+  if (boxes.length && !confirm('すべての判定ボックスを削除します。よろしいですか？')) return;
+  boxes = [];
+  selectedId = null;
+  render();
+};
+
+exportBtn.onclick = () => {
+  const out = document.createElement('canvas');
+  out.width = canvas.width;
+  out.height = canvas.height;
+  drawScene(out.getContext('2d'), false);
+  const a = document.createElement('a');
+  a.download = 'hitbox.png';
+  a.href = out.toDataURL('image/png');
+  a.click();
+};
+
+render();
+</script>
+
+</body>
+</html>
