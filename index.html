@@ -301,6 +301,11 @@
         <button id="btn-ai-clear" disabled>AI分を消す</button>
         <button id="btn-mask" disabled>抽出を見る</button>
       </div>
+      <div class="row">
+        <label for="ai-grid">粗さ</label>
+        <input type="range" id="ai-grid" min="6" max="40" value="20">
+        <output id="ai-grid-out" class="mono">20</output>
+      </div>
       <p class="hint" id="ai-status">画像を入れると自動で食らい判定が付きます。初回のみAIモデルをダウンロード。</p>
     </section>
 
@@ -321,11 +326,6 @@
           <label for="stroke">枠線</label>
           <input type="range" id="stroke" min="1" max="10" value="3">
           <output id="stroke-out" class="mono">3px</output>
-        </div>
-        <div class="row">
-          <label for="ai-grid">粗さ</label>
-          <input type="range" id="ai-grid" min="6" max="40" value="20">
-          <output id="ai-grid-out" class="mono">20</output>
         </div>
         <div class="row">
           <label for="ai-cover">カバー率</label>
