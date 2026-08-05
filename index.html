@@ -291,6 +291,7 @@
   <button id="btn-open">開く</button>
   <button id="btn-clear">消去</button>
   <button id="btn-copy" disabled>コピー</button>
+  <button id="btn-share" disabled hidden>共有</button>
   <button id="btn-export" class="primary" disabled>保存</button>
   <input type="file" id="file-input" accept="image/*">
 </header>
@@ -351,6 +352,16 @@
           <label for="ai-cover">カバー率</label>
           <input type="range" id="ai-cover" min="50" max="98" value="92">
           <output id="ai-cover-out" class="mono">92%</output>
+        </div>
+        <div class="row">
+          <label for="wm-toggle">透かし</label>
+          <input type="checkbox" id="wm-toggle" checked style="width:20px;height:20px;accent-color:var(--accent);">
+          <span class="hint" style="flex:1">書き出しにツール名を入れる</span>
+        </div>
+        <div class="row">
+          <label for="hit-toggle">攻撃推測</label>
+          <input type="checkbox" id="hit-toggle" checked style="width:20px;height:20px;accent-color:var(--accent);">
+          <span class="hint" style="flex:1">突端に攻撃判定を自動配置</span>
         </div>
         <div class="row">
           <label for="ai-model">モデル</label>
@@ -469,6 +480,7 @@ function loadFile(file) {
     dropzone.classList.add('hidden');
     exportBtn.disabled = false;
     document.getElementById('btn-copy').disabled = false;
+    document.getElementById('btn-share').disabled = false;
     history.length = 0;
     aiBtn.disabled = false;
     aiClearBtn.disabled = true;
@@ -763,14 +775,31 @@ document.getElementById('btn-clear').onclick = () => {
   render();
 };
 
-// PNG をクリップボードにコピー
-const copyBtn = document.getElementById('btn-copy');
-copyBtn.onclick = () => {
+// 書き出し用キャンバス（透かし付き）
+function buildExportCanvas() {
   const out = document.createElement('canvas');
   out.width = canvas.width;
   out.height = canvas.height;
-  drawScene(out.getContext('2d'), false);
-  out.toBlob(async blob => {
+  const c = out.getContext('2d');
+  drawScene(c, false);
+  if (document.getElementById('wm-toggle').checked) {
+    const fs = Math.max(11, Math.round(canvas.width * 0.018));
+    c.font = `600 ${fs}px ui-monospace, Menlo, monospace`;
+    c.textAlign = 'right';
+    c.textBaseline = 'bottom';
+    const pad = Math.round(fs * 0.7);
+    c.fillStyle = '#00000055';
+    c.fillText('HITBOX_MAKER', out.width - pad + 1, out.height - pad + 1);
+    c.fillStyle = '#f2c14ecc';
+    c.fillText('HITBOX_MAKER', out.width - pad, out.height - pad);
+  }
+  return out;
+}
+
+// PNG をクリップボードにコピー
+const copyBtn = document.getElementById('btn-copy');
+copyBtn.onclick = () => {
+  buildExportCanvas().toBlob(async blob => {
     try {
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
       copyBtn.textContent = 'コピーした!';
@@ -778,6 +807,23 @@ copyBtn.onclick = () => {
       copyBtn.textContent = 'コピー不可';
     }
     setTimeout(() => { copyBtn.textContent = 'コピー'; }, 1500);
+  });
+};
+
+// 共有 (Web Share API 対応環境のみ表示)
+const shareBtn = document.getElementById('btn-share');
+if (navigator.share && navigator.canShare) shareBtn.hidden = false;
+shareBtn.onclick = () => {
+  buildExportCanvas().toBlob(async blob => {
+    const file = new File([blob], 'hitbox.png', { type: 'image/png' });
+    try {
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], text: '判定付与!! #判定メーカー' });
+      } else {
+        shareBtn.textContent = '共有不可';
+        setTimeout(() => { shareBtn.textContent = '共有'; }, 1500);
+      }
+    } catch { /* ユーザーキャンセル等は無視 */ }
   });
 };
 
@@ -799,13 +845,9 @@ document.getElementById('btn-sample').onclick = e => {
 };
 
 exportBtn.onclick = () => {
-  const out = document.createElement('canvas');
-  out.width = canvas.width;
-  out.height = canvas.height;
-  drawScene(out.getContext('2d'), false);
   const a = document.createElement('a');
   a.download = 'hitbox.png';
-  a.href = out.toDataURL('image/png');
+  a.href = buildExportCanvas().toDataURL('image/png');
   a.click();
 };
 
@@ -984,14 +1026,49 @@ function maskToBoxes(mask, gridCount, coverTarget) {
   return rects;
 }
 
+// シルエット重心から一番「突き出た」先端を攻撃判定として推測
+function suggestAttackBox() {
+  const { data, w, h } = maskCache;
+  const stride = 4;
+  let sx = 0, sy = 0, n = 0;
+  for (let y = 0; y < h; y += stride) {
+    for (let x = 0; x < w; x += stride) {
+      if (data[y * w + x] > 127) { sx += x; sy += y; n++; }
+    }
+  }
+  if (!n) return null;
+  const cx = sx / n, cy = sy / n;
+  // 横方向の突出を重めに評価（攻撃は横に伸びがち）
+  let best = null, bestD = -1;
+  for (let y = 0; y < h; y += stride) {
+    for (let x = 0; x < w; x += stride) {
+      if (data[y * w + x] <= 127) continue;
+      const d = ((x - cx) * 1.5) ** 2 + ((y - cy) * 0.8) ** 2;
+      if (d > bestD) { bestD = d; best = { x, y }; }
+    }
+  }
+  if (!best) return null;
+  const s = Math.max(w, h) * 0.13;
+  return {
+    x: Math.min(Math.max(best.x - s / 2, 0), w - s),
+    y: Math.min(Math.max(best.y - s / 2, 0), h - s),
+    w: s, h: s,
+  };
+}
+
 function regenerateBoxes() {
   snapshot();
   boxes = boxes.filter(b => !b.aiGenerated);
   const rects = maskToBoxes(maskCache, +aiGridEl.value, aiCoverEl.value / 100);
   for (const rc of rects) boxes.push({ id: nextId++, type: 'hurt', aiGenerated: true, ...rc });
+  if (document.getElementById('hit-toggle').checked) {
+    const atk = suggestAttackBox();
+    if (atk) boxes.push({ id: nextId++, type: 'hit', aiGenerated: true, ...atk });
+  }
   selectedId = null;
-  aiClearBtn.disabled = rects.length === 0;
-  setAiStatus(`食らい判定を ${rects.length} 個生成。スライダーで粗さ・密度を再調整できます。`);
+  const hasAtk = boxes.some(b => b.aiGenerated && b.type === 'hit');
+  aiClearBtn.disabled = !boxes.some(b => b.aiGenerated);
+  setAiStatus(`食らい判定 ${rects.length} 個${hasAtk ? ' + 攻撃判定を推測' : ''}。粗さで再調整できます。`);
   render();
 }
 
