@@ -1000,7 +1000,9 @@ window.addEventListener('paste', e => {
   }
 });
 
-const MAX_IMAGE_DIMENSION = 2048;
+// スマホでは編集Canvasを1280pxに抑える。画面表示では差が出にくく、
+// 2048px比で再描画するピクセル数とメモリ使用量を約6割削減できる。
+const MAX_IMAGE_DIMENSION = MOBILE_FAST_MODE ? 1280 : 2048;
 
 async function prepareWorkingImage(file) {
   const source = await createImageBitmap(file, { imageOrientation: 'from-image' });
@@ -1183,7 +1185,7 @@ canvas.addEventListener('pointermove', e => {
     if (drag.handle.includes('n')) { b.h = bottom - p.y; b.y = p.y; }
     if (drag.handle.includes('s')) { b.h = p.y - b.y; }
   }
-  render();
+  scheduleRender(false);
 });
 
 canvas.addEventListener('pointerup', () => {
@@ -1311,6 +1313,20 @@ function drawScene(c, uiLayer) {
   for (const t of TYPES) {
     const list = groups.get(t.id);
     if (!list) continue;
+    // スマホの操作中は巨大な一時Canvasをタイプごとに3枚生成しない。
+    // 単純な矩形描画ならGC停止がなく、指への追従も十分滑らかになる。
+    if (MOBILE_FAST_MODE) {
+      c.fillStyle = t.color;
+      c.strokeStyle = t.color;
+      c.lineWidth = sw;
+      for (const b of list) {
+        c.globalAlpha = fillOpacity;
+        c.fillRect(b.x, b.y, b.w, b.h);
+        c.globalAlpha = 1;
+        c.strokeRect(b.x, b.y, b.w, b.h);
+      }
+      continue;
+    }
     // 結合シルエット（不透明マスク）
     const m = document.createElement('canvas');
     m.width = canvas.width; m.height = canvas.height;
@@ -1363,9 +1379,27 @@ function drawScene(c, uiLayer) {
   c.restore();
 }
 
+let renderFrame = 0;
+let renderListPending = false;
+function scheduleRender(updateList = false) {
+  renderListPending ||= updateList;
+  if (renderFrame) return;
+  renderFrame = requestAnimationFrame(() => {
+    renderFrame = 0;
+    drawScene(ctx, true);
+    if (renderListPending) renderList();
+    renderListPending = false;
+  });
+}
+
 function render() {
+  if (renderFrame) {
+    cancelAnimationFrame(renderFrame);
+    renderFrame = 0;
+  }
   drawScene(ctx, true);
   renderList();
+  renderListPending = false;
 }
 
 const openGroups = new Set(); // 再描画をまたいで開閉状態を保持
@@ -1568,11 +1602,23 @@ document.getElementById('btn-sample').onclick = e => {
 };
 
 exportBtn.onclick = () => {
-  const a = document.createElement('a');
-  a.download = 'hitbox.png';
-  a.href = buildExportCanvas().toDataURL('image/png');
-  a.click();
-  showShareStatus('PNGを保存しました。「投稿文をコピー」からすぐシェアできます。');
+  exportBtn.disabled = true;
+  exportBtn.textContent = '保存中…';
+  buildExportCanvas().toBlob(blob => {
+    if (blob) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.download = 'hitbox.png';
+      a.href = url;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showShareStatus('PNGを保存しました。「投稿文をコピー」からすぐシェアできます。');
+    } else {
+      showShareStatus('PNGを保存できませんでした。もう一度お試しください。');
+    }
+    exportBtn.disabled = false;
+    exportBtn.textContent = '保存';
+  }, 'image/png');
 };
 
 // ---- AI判定生成（RMBG-1.4 / onnxruntime-web） ----
