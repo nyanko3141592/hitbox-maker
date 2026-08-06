@@ -181,6 +181,7 @@
   .type-btn.active { border-color: var(--accent); background: #f2c14e14; }
 
   .row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .row[hidden] { display: none; }
   .row label { font-size: .8rem; color: var(--text-dim); flex: none; width: 5.5em; }
   input[type="range"] { flex: 1; accent-color: var(--accent); }
   .row output { font-size: .8rem; width: 3em; text-align: right; }
@@ -250,6 +251,9 @@
     min-width: 0;
   }
   .hint { font-size: .75rem; color: var(--text-dim); line-height: 1.6; }
+  .ugc-links { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+  .ugc-links a { color: var(--text-dim); font-size: .75rem; }
+  .ugc-links a:hover { color: var(--text); }
   kbd {
     font-family: ui-monospace, monospace;
     background: var(--panel-2);
@@ -632,6 +636,7 @@
   </div>
   <footer class="home-footer">
     <button id="btn-terms" class="linklike">利用規約とプライバシー</button>
+    <a href="https://x.com/search?q=%23%E5%88%A4%E5%AE%9A%E3%83%A1%E3%83%BC%E3%82%AB%E3%83%BC&src=typed_query" target="_blank" rel="noopener">みんなの作品</a>
     <a href="https://github.com/nyanko3141592/hitbox-maker" target="_blank" rel="noopener">ソースコード (AGPL-3.0)</a>
   </footer>
 </div>
@@ -657,6 +662,7 @@
   <button id="btn-share" disabled hidden>共有</button>
   <button id="btn-export" class="primary" disabled>保存</button>
   <input type="file" id="file-input" accept="image/*">
+  <input type="file" id="background-input" accept="image/*">
 </header>
 
 <main>
@@ -698,8 +704,17 @@
         <select id="background-mode" disabled>
           <option value="original" selected>元画像</option>
           <option value="training">トレーニングルーム</option>
-          <option value="street">ストリートステージ（生成背景）</option>
+          <option value="custom">自分の画像をアップロード…</option>
         </select>
+      </div>
+      <div class="row" id="background-upload-row" hidden>
+        <label for="background-input">背景画像</label>
+        <button id="btn-background-upload" type="button">画像を変更</button>
+      </div>
+      <div class="row" id="ground-position-row" hidden>
+        <label for="ground-position">床位置</label>
+        <input type="range" id="ground-position" min="45" max="95" value="72">
+        <output id="ground-position-out" class="mono">72%</output>
       </div>
       <p class="hint" id="ai-status">画像を入れると自動で食らい判定が付きます。初回のみAIモデルをダウンロード。</p>
     </section>
@@ -709,6 +724,20 @@
         <summary>レイヤー</summary>
         <div id="box-list"></div>
       </details>
+    </section>
+
+    <section id="share-panel">
+      <h2>作品をシェア</h2>
+      <p class="hint">保存した画像を投稿して、みんなの判定と比べてみよう。</p>
+      <div class="btn-row" style="margin-top:8px;">
+        <button id="btn-caption" disabled>投稿文をコピー</button>
+        <button id="btn-x" disabled>Xで投稿</button>
+      </div>
+      <p class="hint" id="share-status" role="status" aria-live="polite"></p>
+      <div class="ugc-links">
+        <a href="https://x.com/search?q=%23%E5%88%A4%E5%AE%9A%E3%83%A1%E3%83%BC%E3%82%AB%E3%83%BC&src=typed_query" target="_blank" rel="noopener">#判定メーカーを見る ↗</a>
+        <a href="https://github.com/nyanko3141592/hitbox-maker/issues/new" target="_blank" rel="noopener">改善アイデアを送る ↗</a>
+      </div>
     </section>
 
     <section>
@@ -777,9 +806,13 @@ const ctx = canvas.getContext('2d');
 const dropzone = document.getElementById('dropzone');
 const stageWrap = document.getElementById('stage-wrap');
 const fileInput = document.getElementById('file-input');
+const backgroundInput = document.getElementById('background-input');
 const boxList = document.getElementById('box-list');
 const exportBtn = document.getElementById('btn-export');
 const backgroundSelect = document.getElementById('background-mode');
+const backgroundUploadRow = document.getElementById('background-upload-row');
+const groundPositionRow = document.getElementById('ground-position-row');
+const groundPositionEl = document.getElementById('ground-position');
 
 let img = null;
 let boxes = [];          // {id, type, x, y, w, h} 画像ピクセル座標
@@ -792,10 +825,8 @@ let lastBlob = null;   // 現在の画像の元Blob（imglyに渡す）
 let backgroundMode = 'original';
 let subjectCutout = null;
 let subjectBounds = null;
-const STREET_GROUND_RATIO = 0.682;
-const streetBackground = new Image();
-streetBackground.src = 'backgrounds/street-stage.webp';
-streetBackground.onload = () => { if (backgroundMode === 'street') render(); };
+let customBackground = null;
+let customBackgroundUrl = null;
 
 // 画像を読み込んだ作業中は、戻る・更新・タブを閉じる操作で確認を出す。
 // beforeunload の文言はブラウザ側で統一されるため、独自メッセージは指定しない。
@@ -878,6 +909,8 @@ function loadFile(file) {
     exportBtn.disabled = false;
     document.getElementById('btn-copy').disabled = false;
     document.getElementById('btn-share').disabled = false;
+    document.getElementById('btn-caption').disabled = false;
+    document.getElementById('btn-x').disabled = false;
     history.length = 0;
     aiBtn.disabled = false;
     aiClearBtn.disabled = true;
@@ -888,6 +921,8 @@ function loadFile(file) {
     backgroundMode = 'original';
     backgroundSelect.value = 'original';
     backgroundSelect.disabled = true;
+    backgroundUploadRow.hidden = true;
+    groundPositionRow.hidden = true;
     showMask = false;
     maskBtn.disabled = true;
     maskBtn.textContent = '抽出部分を見る';
@@ -1064,20 +1099,17 @@ function getCoverRect(image, w, h) {
   return { x: (w - dw) / 2, y: (h - dh) / 2, w: dw, h: dh };
 }
 
-function drawStreetBackground(c, w, h) {
-  c.fillStyle = '#211c2d';
+function drawCustomBackground(c, w, h) {
+  c.fillStyle = '#202630';
   c.fillRect(0, 0, w, h);
-  if (!streetBackground.complete || !streetBackground.naturalWidth) return;
-  const rect = getCoverRect(streetBackground, w, h);
-  c.drawImage(streetBackground, rect.x, rect.y, rect.w, rect.h);
+  if (!customBackground) return;
+  const rect = getCoverRect(customBackground, w, h);
+  c.drawImage(customBackground, rect.x, rect.y, rect.w, rect.h);
 }
 
 function getGroundY() {
   if (backgroundMode === 'training') return canvas.height * .72;
-  if (backgroundMode === 'street' && streetBackground.complete && streetBackground.naturalWidth) {
-    const rect = getCoverRect(streetBackground, canvas.width, canvas.height);
-    return rect.y + rect.h * STREET_GROUND_RATIO;
-  }
+  if (backgroundMode === 'custom') return canvas.height * (+groundPositionEl.value / 100);
   return canvas.height;
 }
 
@@ -1090,7 +1122,7 @@ function getSceneOffsetY() {
 
 function drawSelectedBackground(c, w, h) {
   if (backgroundMode === 'training') drawTrainingBackground(c, w, h);
-  if (backgroundMode === 'street') drawStreetBackground(c, w, h);
+  if (backgroundMode === 'custom') drawCustomBackground(c, w, h);
 }
 
 function drawSubjectShadow(c, offsetY) {
@@ -1275,11 +1307,42 @@ function buildExportCanvas() {
 
 // PNG をクリップボードにコピー
 const copyBtn = document.getElementById('btn-copy');
+const shareStatus = document.getElementById('share-status');
+
+function buildShareText() {
+  const breakdown = TYPES.map(type => {
+    const count = boxes.filter(box => box.type === type.id).length;
+    return count ? `${type.label}${count}` : '';
+  }).filter(Boolean).join(' / ');
+  const result = breakdown ? `判定付与!! ${breakdown}` : '画像に格ゲー風の当たり判定を付けてみた！';
+  return `${result}\n#判定メーカー #HITBOXMAKER\nhttps://hitbox.nya3neko2.dev/`;
+}
+
+function showShareStatus(message) {
+  shareStatus.textContent = message;
+}
+
+document.getElementById('btn-caption').onclick = async () => {
+  try {
+    await navigator.clipboard.writeText(buildShareText());
+    showShareStatus('投稿文をコピーしました。画像を添えて投稿できます。');
+  } catch {
+    showShareStatus('投稿文をコピーできませんでした。ブラウザの権限を確認してください。');
+  }
+};
+
+document.getElementById('btn-x').onclick = () => {
+  const intent = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(buildShareText());
+  window.open(intent, '_blank', 'noopener,noreferrer');
+  showShareStatus('Xが開きました。保存した画像を添付すると完成です。');
+};
+
 copyBtn.onclick = () => {
   buildExportCanvas().toBlob(async blob => {
     try {
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
       copyBtn.textContent = 'コピーした!';
+      showShareStatus('画像をコピーしました。投稿文もコピーしてシェアできます。');
     } catch {
       copyBtn.textContent = 'コピー不可';
     }
@@ -1295,7 +1358,7 @@ shareBtn.onclick = () => {
     const file = new File([blob], 'hitbox.png', { type: 'image/png' });
     try {
       if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], text: '判定付与!! #判定メーカー' });
+        await navigator.share({ files: [file], text: buildShareText() });
       } else {
         shareBtn.textContent = '共有不可';
         setTimeout(() => { shareBtn.textContent = '共有'; }, 1500);
@@ -1348,6 +1411,7 @@ exportBtn.onclick = () => {
   a.download = 'hitbox.png';
   a.href = buildExportCanvas().toDataURL('image/png');
   a.click();
+  showShareStatus('PNGを保存しました。「投稿文をコピー」からすぐシェアできます。');
 };
 
 // ---- AI判定生成（RMBG-1.4 / onnxruntime-web） ----
@@ -1642,8 +1706,48 @@ maskBtn.onclick = () => {
   render();
 };
 
+function applyBackgroundMode(mode) {
+  backgroundMode = mode;
+  backgroundSelect.value = mode;
+  const isCustom = mode === 'custom';
+  backgroundUploadRow.hidden = !isCustom;
+  groundPositionRow.hidden = !isCustom;
+  render();
+}
+
+function requestCustomBackground() {
+  backgroundInput.click();
+}
+
 backgroundSelect.onchange = () => {
-  backgroundMode = backgroundSelect.value;
+  const requested = backgroundSelect.value;
+  if (requested === 'custom' && !customBackground) {
+    backgroundSelect.value = backgroundMode;
+    requestCustomBackground();
+    return;
+  }
+  applyBackgroundMode(requested);
+};
+
+document.getElementById('btn-background-upload').onclick = requestCustomBackground;
+backgroundInput.onchange = () => {
+  const file = backgroundInput.files[0];
+  backgroundInput.value = '';
+  if (!file || !file.type.startsWith('image/')) return;
+  const url = URL.createObjectURL(file);
+  const nextBackground = new Image();
+  nextBackground.onload = () => {
+    if (customBackgroundUrl) URL.revokeObjectURL(customBackgroundUrl);
+    customBackgroundUrl = url;
+    customBackground = nextBackground;
+    applyBackgroundMode('custom');
+  };
+  nextBackground.onerror = () => URL.revokeObjectURL(url);
+  nextBackground.src = url;
+};
+
+groundPositionEl.oninput = () => {
+  document.getElementById('ground-position-out').textContent = groundPositionEl.value + '%';
   render();
 };
 
