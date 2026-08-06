@@ -45,6 +45,8 @@ npx wrangler deploy
 
 本番は Workers Builds で GitHub の `main` ブランチと連携済みです。以後は `main` への push で自動デプロイされます。詳細は [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) を参照してください。
 
+公開URL: [https://hitbox.nya3neko2.dev/](https://hitbox.nya3neko2.dev/)
+
 SEO・OGPの運用は [docs/SEO.md](docs/SEO.md) を参照してください。
 
 ## 本番確認

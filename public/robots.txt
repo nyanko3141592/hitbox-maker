@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://hitbox-maker.takahashinaoki521.workers.dev/sitemap.xml
+Sitemap: https://hitbox.nya3neko2.dev/sitemap.xml

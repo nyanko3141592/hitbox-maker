@@ -5,7 +5,7 @@
 - ホスティング: Cloudflare Workers Static Assets
 - Worker 名: `hitbox-maker`
 - 公開ディレクトリ: `public/`
-- 本番URL: `https://hitbox-maker.takahashinaoki521.workers.dev/`
+- 本番URL: `https://hitbox.nya3neko2.dev/`
 - Git連携: `nyanko3141592/hitbox-maker` の `main`
 
 `wrangler.jsonc` の `assets.directory` は `./public` です。公開すべきファイルは必ずこのディレクトリに置きます。

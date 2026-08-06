@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-site_url="${1:-https://hitbox-maker.takahashinaoki521.workers.dev}"
+site_url="${1:-https://hitbox.nya3neko2.dev}"
 site_url="${site_url%/}"
 
 require_status() {

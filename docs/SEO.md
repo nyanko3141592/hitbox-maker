@@ -22,4 +22,4 @@
 
 ## 公開後の作業
 
-Google Search Console に本番URLをプロパティとして追加し、`https://hitbox-maker.takahashinaoki521.workers.dev/sitemap.xml` を送信します。インデックス状況は Search Console のURL検査で確認します。
+Google Search Console に本番URLをプロパティとして追加し、`https://hitbox.nya3neko2.dev/sitemap.xml` を送信します。インデックス状況は Search Console のURL検査で確認します。
