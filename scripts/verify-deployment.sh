@@ -15,6 +15,18 @@ require_status() {
   printf 'OK  %s\n' "$path"
 }
 
+require_content_type() {
+  local path="$1"
+  local expected="$2"
+  local actual
+  actual="$(curl --silent --show-error --location --head "$site_url$path" | tr -d '\r' | awk 'BEGIN{IGNORECASE=1} /^content-type:/{print $2; exit}')"
+  if [[ "$actual" != "$expected"* ]]; then
+    printf 'Expected Content-Type %s for %s, received %s\n' "$expected" "$path" "$actual" >&2
+    exit 1
+  fi
+  printf 'OK  %s (%s)\n' "$path" "$actual"
+}
+
 homepage="$(curl --silent --show-error --fail "$site_url/")"
 for expected in \
   '<meta property="og:url" content="' \
@@ -48,6 +60,8 @@ require_status '/samples/demo-fugu.jpg'
 require_status '/samples/demo-cat.webp'
 require_status '/samples/demo-hamster.webp'
 require_status '/samples/demo-fugu.webp'
+require_content_type '/samples/cat.webp' 'image/webp'
+require_content_type '/samples/demo-cat.webp' 'image/webp'
 require_status '/samples/ogp.jpg'
 require_status '/manifest.webmanifest'
 require_status '/sw.js'
