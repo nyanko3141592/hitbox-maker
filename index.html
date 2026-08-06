@@ -329,6 +329,51 @@
     color: var(--text-dim);
   }
 
+  #home .trust {
+    margin-top: 22px;
+    display: flex;
+    gap: 18px;
+    justify-content: center;
+    flex-wrap: wrap;
+    list-style: none;
+    font-size: .82rem;
+    color: var(--text-dim);
+  }
+  .home-footer {
+    display: flex;
+    gap: 22px;
+    justify-content: center;
+    flex-wrap: wrap;
+    font-size: .8rem;
+  }
+  .home-footer a, .linklike {
+    color: var(--text-dim);
+    text-decoration: underline;
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+    min-height: 0 !important;
+    cursor: pointer;
+  }
+  .home-footer a:hover, .linklike:hover { color: var(--text); }
+  #terms {
+    margin: auto;
+    max-width: min(560px, calc(100vw - 32px));
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 24px;
+  }
+  #terms::backdrop { background: #000a; }
+  #terms h2 { font-size: 1.05rem; margin-bottom: 14px; }
+  #terms ol { padding-left: 1.3em; display: flex; flex-direction: column; gap: 10px; font-size: .85rem; line-height: 1.7; color: var(--text-dim); }
+  #terms strong { color: var(--text); }
+  #terms form { margin-top: 18px; text-align: right; }
+
   /* ---- ローディング演出 ---- */
   #loading {
     position: absolute;
@@ -416,13 +461,34 @@
       <button id="btn-home-sample" class="big">サンプルで試す</button>
     </div>
     <p class="drop-hint">ここに画像をドロップ / <kbd>⌘V</kbd> ペーストでもOK</p>
+    <ul class="trust">
+      <li>🔒 画像は端末の外に出ません</li>
+      <li>📴 解析はすべてブラウザ内</li>
+      <li>🆓 無料・登録不要</li>
+    </ul>
   </div>
   <div class="gallery">
     <figure><img src="samples/cat.jpg" alt="猫パンチに判定が付いた例" loading="lazy"><figcaption>発生4F 猫パンチ</figcaption></figure>
     <figure><img src="samples/hamster.jpg" alt="ハムスターのキックに判定が付いた例" loading="lazy"><figcaption>空中回し蹴り</figcaption></figure>
     <figure><img src="samples/fugu.jpg" alt="フグの水ビームに判定が付いた例" loading="lazy"><figcaption>飛び道具（水）</figcaption></figure>
   </div>
+  <footer class="home-footer">
+    <button id="btn-terms" class="linklike">利用規約とプライバシー</button>
+    <a href="https://github.com/nyanko3141592/hitbox-maker" target="_blank" rel="noopener">ソースコード (AGPL-3.0)</a>
+  </footer>
 </div>
+
+<dialog id="terms">
+  <h2>利用規約とプライバシー</h2>
+  <ol>
+    <li><strong>画像はどこにも送信されません。</strong>読み込んだ画像・生成した画像の処理は、すべてあなたのブラウザ内（端末内）で完結します。当サイトはサーバーに画像を保存・送信・収集しません。</li>
+    <li><strong>通信が発生するのは初回のAIモデル取得のみ。</strong>AI解析に使うモデルファイルを配信CDNからダウンロードします（画像データは含まれません）。以降はブラウザにキャッシュされます。</li>
+    <li><strong>生成した画像の権利はあなたにあります。</strong>商用・非商用を問わず自由に利用できます。ただし、元画像に第三者の権利（著作権・肖像権など）が含まれる場合の確認と責任は利用者にあります。</li>
+    <li><strong>本ツールは無保証で提供されます。</strong>AGPL-3.0ライセンスに基づき現状有姿で提供され、利用によって生じたいかなる損害についても作者は責任を負いません。</li>
+    <li><strong>アカウント登録・Cookie・アクセス解析なし。</strong>個人情報は一切収集しません。</li>
+  </ol>
+  <form method="dialog"><button class="primary">閉じる</button></form>
+</dialog>
 
 <header>
   <h1>Hitbox<span>_</span>Maker</h1>
@@ -973,6 +1039,7 @@ shareBtn.onclick = () => {
 // ---- トップ画面 ----
 const home = document.getElementById('home');
 document.getElementById('btn-home-open').onclick = () => fileInput.click();
+document.getElementById('btn-terms').onclick = () => document.getElementById('terms').showModal();
 document.getElementById('btn-home-sample').onclick = () => loadSampleImage();
 home.addEventListener('dragover', e => { e.preventDefault(); home.classList.add('dragover'); });
 home.addEventListener('dragleave', () => home.classList.remove('dragover'));
