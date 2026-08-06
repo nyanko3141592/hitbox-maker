@@ -33,8 +33,8 @@
   "isAccessibleForFree": true,
   "image": "https://hitbox.nya3neko2.dev/samples/ogp.jpg",
   "featureList": [
-    "モデル不要の高速解析による食らい判定の即時生成",
-    "任意のブラウザ内AI高精度化",
+    "ブラウザ内AIによる高精度な被写体抽出",
+    "抽出結果に沿った食らい判定の自動生成",
     "攻撃・投げ・押し合い判定の手動編集",
     "透かし入りPNGの保存・コピー"
   ],
@@ -719,7 +719,7 @@
     <div class="round-status" aria-hidden="true"><span>ROUND 01</span></div>
     <h1 class="logo">HITBOX <span>SNAP</span></h1>
     <p class="tagline">写真を入れたら、判定が付く。</p>
-    <p class="sub">写真を入れたら即判定。背景変更もモデル不要。画像はどこにも送信されません。</p>
+    <p class="sub">写真を入れたら、端末内AIで被写体を抽出して判定を生成。画像はどこにも送信されません。</p>
     <div class="cta">
       <button id="btn-home-open" class="primary big">FIGHT! 写真を選ぶ</button>
       <button id="btn-home-sample" class="big">DEMO</button>
@@ -748,7 +748,7 @@
   <h2>利用規約とプライバシー</h2>
   <ol>
     <li><strong>画像はどこにも送信されません。</strong>読み込んだ画像・生成した画像の処理は、すべてあなたのブラウザ内（端末内）で完結します。当サイトはサーバーに画像を保存・送信・収集しません。</li>
-    <li><strong>通常の判定生成と背景変更にAIモデルのダウンロードは不要です。</strong>PCで任意の「高精度AI」を選んだ場合だけ約42MBの解析モデルを配信CDNから取得します（画像データは含まれません）。スマホでは取得しません。</li>
+    <li><strong>判定生成では必ず端末内AIによる被写体抽出を行います。</strong>初回に約42MBの解析モデルを配信CDNから取得します（画像データは含まれません）。モデルはブラウザにキャッシュされます。</li>
     <li><strong>生成した画像の権利はあなたにあります。</strong>商用・非商用を問わず自由に利用できます。ただし、元画像に第三者の権利（著作権・肖像権など）が含まれる場合の確認と責任は利用者にあります。</li>
     <li><strong>本ツールは無保証で提供されます。</strong>AGPL-3.0ライセンスに基づき現状有姿で提供され、利用によって生じたいかなる損害についても作者は責任を負いません。</li>
     <li><strong>アカウント登録・Cookie・アクセス解析なし。</strong>個人情報は一切収集しません。</li>
@@ -796,7 +796,7 @@
 
     <section>
       <div class="btn-row">
-        <button id="btn-ai" class="primary" disabled>高精度AI（約42MB）</button>
+        <button id="btn-ai" class="primary" disabled>抽出を再試行</button>
         <button id="btn-mask" disabled>抽出を見る</button>
       </div>
       <div class="row">
@@ -821,7 +821,7 @@
         <input type="range" id="ground-position" min="45" max="95" value="72">
         <output id="ground-position-out" class="mono">72%</output>
       </div>
-      <p class="hint" id="ai-status">画像を入れると、ダウンロードなしですぐ判定が付きます。</p>
+      <p class="hint" id="ai-status">画像を入れると、被写体抽出後に食らい判定が付きます。初回のみ約42MB。</p>
     </section>
 
     <section id="share-panel">
@@ -959,6 +959,13 @@ function confirmImageReplacement() {
   return !lastBlob || confirm('現在の画像と判定が消えます。新しい画像に置き換えますか？');
 }
 
+function setOutputEnabled(enabled) {
+  exportBtn.disabled = !enabled;
+  for (const id of ['btn-copy', 'btn-share', 'btn-caption', 'btn-x']) {
+    document.getElementById(id).disabled = !enabled;
+  }
+}
+
 // ---- 判定タイプUI ----
 const typeGrid = document.getElementById('type-grid');
 for (const t of TYPES) {
@@ -1060,16 +1067,12 @@ async function loadFile(file) {
     boxes = [];
     selectedId = null;
     dropzone.classList.add('hidden');
-    exportBtn.disabled = false;
-    document.getElementById('btn-copy').disabled = false;
-    document.getElementById('btn-share').disabled = false;
-    document.getElementById('btn-caption').disabled = false;
-    document.getElementById('btn-x').disabled = false;
+    setOutputEnabled(false);
     history.length = 0;
     updateUndoState();
-    aiBtn.disabled = MOBILE_FAST_MODE;
-    aiBtn.hidden = MOBILE_FAST_MODE;
-    aiBtn.textContent = '高精度AI（約42MB）';
+    aiBtn.disabled = true;
+    aiBtn.hidden = false;
+    aiBtn.textContent = '抽出を再試行';
     aiClearBtn.disabled = true;
     maskCache = null;
     maskOverlay = null;
@@ -1084,7 +1087,7 @@ async function loadFile(file) {
     maskBtn.disabled = true;
     maskBtn.textContent = '抽出部分を見る';
     render();
-    quickAnnotate(); // モデル不要の高速判定を即生成
+    autoAnnotate({ askBeforeDownload: false }); // 必ず高精度な被写体抽出を行う
   } catch (err) {
     console.error(err);
     alert('画像を読み込めませんでした。別の画像でもう一度お試しください。');
@@ -1330,6 +1333,20 @@ function getSceneBase() {
   return sceneBase;
 }
 
+let unionScratch = null;
+function getUnionScratch() {
+  if (!unionScratch) {
+    unionScratch = ['mask', 'eroded', 'outline'].map(() => document.createElement('canvas'));
+  }
+  for (const scratch of unionScratch) {
+    if (scratch.width !== canvas.width || scratch.height !== canvas.height) {
+      scratch.width = canvas.width;
+      scratch.height = canvas.height;
+    }
+  }
+  return unionScratch;
+}
+
 function drawScene(c, uiLayer) {
   c.clearRect(0, 0, canvas.width, canvas.height);
   const replacesBackground = img && backgroundMode !== 'original' && subjectCutout;
@@ -1349,24 +1366,11 @@ function drawScene(c, uiLayer) {
   for (const t of TYPES) {
     const list = groups.get(t.id);
     if (!list) continue;
-    // スマホの操作中は巨大な一時Canvasをタイプごとに3枚生成しない。
-    // 単純な矩形描画ならGC停止がなく、指への追従も十分滑らかになる。
-    if (MOBILE_FAST_MODE) {
-      c.fillStyle = t.color;
-      c.strokeStyle = t.color;
-      c.lineWidth = sw;
-      for (const b of list) {
-        c.globalAlpha = fillOpacity;
-        c.fillRect(b.x, b.y, b.w, b.h);
-        c.globalAlpha = 1;
-        c.strokeRect(b.x, b.y, b.w, b.h);
-      }
-      continue;
-    }
     // 結合シルエット（不透明マスク）
-    const m = document.createElement('canvas');
-    m.width = canvas.width; m.height = canvas.height;
+    const [m, e, o] = getUnionScratch();
     const mc = m.getContext('2d');
+    mc.globalCompositeOperation = 'source-over';
+    mc.clearRect(0, 0, m.width, m.height);
     mc.fillStyle = t.color;
     for (const b of list) {
       // 整数座標にスナップ（小数座標だとAAで結合部に細い継ぎ目が出る）
@@ -1378,17 +1382,17 @@ function drawScene(c, uiLayer) {
     c.drawImage(m, 0, 0);
     c.globalAlpha = 1;
     // 枠線: erode(S) = 8方向シフトの積集合。S - erode(S) が外周リング
-    const e = document.createElement('canvas');
-    e.width = canvas.width; e.height = canvas.height;
     const ec = e.getContext('2d');
+    ec.globalCompositeOperation = 'source-over';
+    ec.clearRect(0, 0, e.width, e.height);
     ec.drawImage(m, 0, 0);
     ec.globalCompositeOperation = 'destination-in';
     for (const [dx, dy] of [[sw,0],[-sw,0],[0,sw],[0,-sw],[sw,sw],[sw,-sw],[-sw,sw],[-sw,-sw]]) {
       ec.drawImage(m, dx, dy);
     }
-    const o = document.createElement('canvas');
-    o.width = canvas.width; o.height = canvas.height;
     const oc = o.getContext('2d');
+    oc.globalCompositeOperation = 'source-over';
+    oc.clearRect(0, 0, o.width, o.height);
     oc.drawImage(m, 0, 0);
     oc.globalCompositeOperation = 'destination-out';
     oc.drawImage(e, 0, 0);
@@ -2188,12 +2192,9 @@ groundPositionEl.oninput = () => {
   scheduleRender(false);
 };
 
-async function autoAnnotate() {
-  if (MOBILE_FAST_MODE) {
-    setAiStatus('スマホは高速モードです。AIモデルのダウンロードは行いません。');
-    return;
-  }
-  if (!confirm('高精度AIモデル（約42MB）をダウンロードします。通信環境によって時間がかかります。続けますか？')) return;
+async function autoAnnotate({ askBeforeDownload = true } = {}) {
+  if (askBeforeDownload && !removeBackgroundFn &&
+      !confirm('被写体抽出モデル（約42MB）をダウンロードします。続けますか？')) return;
   aiBtn.disabled = true;
   document.getElementById('loading').classList.add('on');
   startFunMessages();
@@ -2205,6 +2206,7 @@ async function autoAnnotate() {
     maskBtn.disabled = false;
     backgroundSelect.disabled = false;
     aiBtn.textContent = 'AI再解析';
+    setOutputEnabled(true);
     stopFunMessages();
     regenerateBoxes({ preserveUndo: false });
     history.length = 0;
@@ -2213,7 +2215,8 @@ async function autoAnnotate() {
   } catch (err) {
     console.error(err);
     stopFunMessages();
-    setAiStatus('エラー: ' + err.message + ' — 「再解析」で再試行できます。');
+    aiBtn.textContent = '抽出を再試行';
+    setAiStatus('エラー: ' + err.message + ' — 「抽出を再試行」からやり直せます。');
   } finally {
     aiBtn.disabled = false;
     document.getElementById('loading').classList.remove('on');
@@ -2221,7 +2224,7 @@ async function autoAnnotate() {
 }
 
 aiBtn.onclick = () => { if (img) autoAnnotate(); };
-document.getElementById('ai-model').onchange = () => { if (img && !MOBILE_FAST_MODE) autoAnnotate(); };
+document.getElementById('ai-model').onchange = () => { if (img) autoAnnotate({ askBeforeDownload: false }); };
 
 aiClearBtn.onclick = () => {
   snapshot();
