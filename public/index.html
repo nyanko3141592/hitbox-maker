@@ -71,6 +71,7 @@
   }
   .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
   .mobile-only { display: none; }
+  .mobile-label { display: none; }
 
   header {
     display: flex;
@@ -467,7 +468,7 @@
     #home {
       min-height: 100dvh;
       height: 100dvh;
-      justify-content: center;
+      justify-content: flex-start;
       gap: 10px;
       overflow: hidden;
       padding:
@@ -509,7 +510,12 @@
     }
     #home .tagline { margin-top: 9px; font-size: .92rem; }
     #home .sub { display: none; }
-    #home .cta { margin-top: 13px; gap: 7px; flex-wrap: nowrap; }
+    #home .cta {
+      margin-top: 13px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.55fr) minmax(0, .85fr);
+      gap: 7px;
+    }
     #home button.big {
       flex: 1;
       min-width: 0;
@@ -521,7 +527,7 @@
       text-transform: uppercase;
       clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
     }
-    #home .drop-hint { margin-top: 8px; font-size: .68rem; }
+    #home .drop-hint { display: none; }
     #home .fighter-select-title {
       display: flex;
       align-items: center;
@@ -562,23 +568,37 @@
       font-variant-numeric: tabular-nums;
     }
     #home .gallery figcaption {
-      min-height: 2.7em;
-      padding: 6px;
+      position: absolute;
+      inset: auto 0 0;
+      min-height: 0;
+      padding: 5px 6px;
       font-size: .63rem;
       letter-spacing: 0;
-      line-height: 1.35;
+      line-height: 1.2;
+      color: var(--text);
+      background: #101318dc;
+      white-space: nowrap;
+      text-overflow: ellipsis;
       overflow: hidden;
     }
     #home .trust {
       width: 100%;
-      margin-top: 0;
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 4px;
-      font-size: .62rem;
-      line-height: 1.35;
+      margin-top: 9px;
+      display: block;
+      font-size: .68rem;
+      line-height: 1.4;
     }
-    .home-footer { gap: 14px; font-size: .7rem; }
+    #home .trust li { display: inline; }
+    #home .trust li + li::before { content: " · "; color: var(--accent); }
+    .home-footer {
+      width: 100%;
+      margin-top: auto;
+      gap: 0;
+      justify-content: space-around;
+      font-size: .7rem;
+    }
+    .desktop-label { display: none; }
+    .mobile-label { display: inline; }
 
     header {
       position: fixed;
@@ -688,8 +708,7 @@
     #home .round-status { margin-bottom: 5px; }
     #home .tagline { margin-top: 7px; }
     #home .cta { margin-top: 10px; }
-    #home .trust { display: none; }
-    #home .gallery figcaption { display: none; }
+    #home .gallery figcaption { display: block; }
   }
 </style>
 </head>
@@ -701,26 +720,26 @@
     <p class="tagline">写真を入れたら、判定が付く。</p>
     <p class="sub">AIがキャラを抜き出して食らい判定を自動生成。解析はぜんぶ端末の中、どこにも送信されません。</p>
     <div class="cta">
-      <button id="btn-home-open" class="primary big">FIGHT! 画像を選ぶ</button>
-      <button id="btn-home-sample" class="big">DEMO MATCH</button>
+      <button id="btn-home-open" class="primary big">FIGHT! 写真を選ぶ</button>
+      <button id="btn-home-sample" class="big">DEMO</button>
     </div>
     <p class="drop-hint">ここに画像をドロップ / <kbd>⌘V</kbd> ペーストでもOK</p>
     <ul class="trust">
-      <li>🔒 画像は端末の外に出ません</li>
-      <li>📴 解析はすべてブラウザ内</li>
-      <li>🆓 無料・登録不要</li>
+      <li>画像送信なし</li>
+      <li>追跡なし</li>
+      <li>無料・登録不要</li>
     </ul>
   </div>
-  <p class="fighter-select-title" aria-hidden="true">SELECT YOUR FIGHTER</p>
+  <p class="fighter-select-title" aria-hidden="true">MATCH EXAMPLES</p>
   <div class="gallery">
     <figure><span class="sample-no" aria-hidden="true">01</span><img src="samples/cat.jpg" alt="猫パンチに判定が付いた例" loading="lazy"><figcaption>発生4F 猫パンチ</figcaption></figure>
     <figure><span class="sample-no" aria-hidden="true">02</span><img src="samples/hamster.jpg" alt="ハムスターのキックに判定が付いた例" loading="lazy"><figcaption>空中回し蹴り</figcaption></figure>
     <figure><span class="sample-no" aria-hidden="true">03</span><img src="samples/fugu.jpg" alt="フグの水ビームに判定が付いた例" loading="lazy"><figcaption>飛び道具（水）</figcaption></figure>
   </div>
   <footer class="home-footer">
-    <button id="btn-terms" class="linklike">利用規約とプライバシー</button>
-    <a href="https://x.com/search?q=%23HITBOXSNAP&src=typed_query" target="_blank" rel="noopener">みんなの作品</a>
-    <a href="https://github.com/nyanko3141592/hitbox-maker" target="_blank" rel="noopener">ソースコード (AGPL-3.0)</a>
+    <button id="btn-terms" class="linklike"><span class="desktop-label">利用規約とプライバシー</span><span class="mobile-label">規約・プライバシー</span></button>
+    <a href="https://x.com/search?q=%23HITBOXSNAP&src=typed_query" target="_blank" rel="noopener"><span class="desktop-label">みんなの作品</span><span class="mobile-label">作品</span></a>
+    <a href="https://github.com/nyanko3141592/hitbox-maker" target="_blank" rel="noopener"><span class="desktop-label">ソースコード (AGPL-3.0)</span><span class="mobile-label">GitHub</span></a>
   </footer>
 </div>
 
