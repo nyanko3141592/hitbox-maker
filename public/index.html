@@ -3,28 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>判定メーカー — HITBOX MAKER</title>
+<title>HITBOX SNAP — 写真を入れたら、判定が付く。</title>
 <meta name="description" content="画像を入れるだけで格ゲー風の当たり判定が付く。AIがブラウザ内でキャラを抜き出して食らい判定を自動生成。無料・登録不要・画像はどこにも送信されません。">
 <meta name="robots" content="index,follow,max-image-preview:large">
 <meta name="theme-color" content="#101318">
 <link rel="canonical" href="https://hitbox.nya3neko2.dev/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%23101318'/%3E%3Crect x='16' y='30' width='46' height='54' fill='%232e7ce84d' stroke='%232e7ce8' stroke-width='7'/%3E%3Crect x='48' y='16' width='38' height='36' fill='%23e8394a4d' stroke='%23e8394a' stroke-width='7'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="HITBOX MAKER">
-<meta property="og:title" content="判定メーカー — HITBOX MAKER">
+<meta property="og:site_name" content="HITBOX SNAP">
+<meta property="og:title" content="HITBOX SNAP — 写真を入れたら、判定が付く。">
 <meta property="og:description" content="画像を入れるだけで格ゲー風の当たり判定が付く。AIがローカルで自動生成、無料。">
 <meta property="og:image" content="https://hitbox.nya3neko2.dev/samples/ogp.jpg">
 <meta property="og:url" content="https://hitbox.nya3neko2.dev/">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="判定メーカー — HITBOX MAKER">
+<meta name="twitter:title" content="HITBOX SNAP — 写真を入れたら、判定が付く。">
 <meta name="twitter:description" content="画像を入れるだけで格ゲー風の当たり判定が付く。AIがローカルで自動生成、無料。">
 <meta name="twitter:image" content="https://hitbox.nya3neko2.dev/samples/ogp.jpg">
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  "name": "判定メーカー — HITBOX MAKER",
+  "name": "HITBOX SNAP",
   "url": "https://hitbox.nya3neko2.dev/",
   "description": "画像を入れるだけで格ゲー風の当たり判定が付く、ブラウザ内完結の無料Webツール。",
   "applicationCategory": "UtilitiesApplication",
@@ -69,6 +70,7 @@
     overflow: hidden;
   }
   .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .mobile-only { display: none; }
 
   header {
     display: flex;
@@ -636,19 +638,25 @@
       overflow: hidden;
     }
     body.editing #stage-wrap {
-      flex: 0 0 52%;
+      flex: 1 1 auto;
       height: auto;
       min-height: 0;
     }
     body.editing aside {
-      flex: 1 1 auto;
-      min-height: 0;
+      display: none;
+      position: fixed;
+      inset: auto 0 calc(57px + env(safe-area-inset-bottom));
+      z-index: 19;
+      width: 100%;
+      max-height: min(58dvh, 520px);
       overflow-y: auto;
       overscroll-behavior-y: contain;
       scroll-padding-bottom: 16px;
       scrollbar-width: thin;
       -webkit-overflow-scrolling: touch;
+      box-shadow: 0 -8px 24px #0009;
     }
+    body.editing.tweaks-open aside { display: flex; }
     body.editing aside section:last-child {
       padding-bottom: max(16px, env(safe-area-inset-bottom));
     }
@@ -670,6 +678,9 @@
     #share-status:empty { display: none; }
     .ugc-links { justify-content: space-between; }
     .hint kbd { display: inline; }
+    header .mobile-only { display: block; }
+    header #btn-open, header #btn-clear, header #btn-copy { display: none; }
+    #btn-tune[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
   }
   @media (max-width: 760px) and (max-height: 680px) {
     #home { gap: 7px; }
@@ -686,8 +697,8 @@
 <div id="home">
   <div class="hero">
     <div class="round-status" aria-hidden="true"><span>ROUND 01</span></div>
-    <h1 class="logo">HITBOX<span>_</span>MAKER</h1>
-    <p class="tagline">画像を入れるだけで、格ゲー風の判定が付く。</p>
+    <h1 class="logo">HITBOX <span>SNAP</span></h1>
+    <p class="tagline">写真を入れたら、判定が付く。</p>
     <p class="sub">AIがキャラを抜き出して食らい判定を自動生成。解析はぜんぶ端末の中、どこにも送信されません。</p>
     <div class="cta">
       <button id="btn-home-open" class="primary big">FIGHT! 画像を選ぶ</button>
@@ -708,7 +719,7 @@
   </div>
   <footer class="home-footer">
     <button id="btn-terms" class="linklike">利用規約とプライバシー</button>
-    <a href="https://x.com/search?q=%23%E5%88%A4%E5%AE%9A%E3%83%A1%E3%83%BC%E3%82%AB%E3%83%BC&src=typed_query" target="_blank" rel="noopener">みんなの作品</a>
+    <a href="https://x.com/search?q=%23HITBOXSNAP&src=typed_query" target="_blank" rel="noopener">みんなの作品</a>
     <a href="https://github.com/nyanko3141592/hitbox-maker" target="_blank" rel="noopener">ソースコード (AGPL-3.0)</a>
   </footer>
 </div>
@@ -726,10 +737,12 @@
 </dialog>
 
 <header>
-  <button id="btn-home-return" class="header-brand" aria-label="トップへ戻る">Hitbox<span>_</span>Maker</button>
+  <button id="btn-home-return" class="header-brand" aria-label="トップへ戻る">Hitbox <span>Snap</span></button>
   <div class="spacer"></div>
   <button id="btn-open">開く</button>
   <button id="btn-clear">消去</button>
+  <button id="btn-undo" class="mobile-only" disabled>戻す</button>
+  <button id="btn-tune" class="mobile-only" aria-expanded="false" aria-controls="tweak-panel">微調整</button>
   <button id="btn-copy" disabled>コピー</button>
   <button id="btn-share" disabled hidden>共有</button>
   <button id="btn-export" class="primary" disabled>保存</button>
@@ -756,7 +769,7 @@
     </div>
   </div>
 
-  <aside>
+  <aside id="tweak-panel" aria-label="微調整">
     <section>
       <div class="type-grid" id="type-grid"></div>
     </section>
@@ -800,7 +813,7 @@
       </div>
       <p class="hint" id="share-status" role="status" aria-live="polite"></p>
       <div class="ugc-links">
-        <a href="https://x.com/search?q=%23%E5%88%A4%E5%AE%9A%E3%83%A1%E3%83%BC%E3%82%AB%E3%83%BC&src=typed_query" target="_blank" rel="noopener">#判定メーカーを見る ↗</a>
+        <a href="https://x.com/search?q=%23HITBOXSNAP&src=typed_query" target="_blank" rel="noopener">#HITBOXSNAPを見る ↗</a>
         <a href="https://github.com/nyanko3141592/hitbox-maker/issues/new" target="_blank" rel="noopener">改善アイデアを送る ↗</a>
       </div>
     </section>
@@ -968,6 +981,9 @@ window.addEventListener('paste', e => {
 function loadFile(file) {
   if (!confirmImageReplacement()) return;
   document.body.classList.add('editing'); // トップ画面→作成画面へ
+  document.body.classList.remove('tweaks-open');
+  document.getElementById('btn-tune').setAttribute('aria-expanded', 'false');
+  document.getElementById('btn-tune').textContent = '微調整';
   lastBlob = file;
   const url = URL.createObjectURL(file);
   const im = new Image();
@@ -984,6 +1000,7 @@ function loadFile(file) {
     document.getElementById('btn-caption').disabled = false;
     document.getElementById('btn-x').disabled = false;
     history.length = 0;
+    updateUndoState();
     aiBtn.disabled = false;
     aiClearBtn.disabled = true;
     maskCache = null;
@@ -1040,9 +1057,12 @@ function hitBox(p) {
 
 // ---- Undo ----
 const history = [];
+const undoBtn = document.getElementById('btn-undo');
+function updateUndoState() { undoBtn.disabled = history.length === 0; }
 function snapshot() {
   history.push(JSON.stringify(boxes));
   if (history.length > 50) history.shift();
+  updateUndoState();
 }
 function undo() {
   // 変化のないスナップショット（選択クリックだけ等）はスキップ
@@ -1053,10 +1073,13 @@ function undo() {
       selectedId = null;
       aiClearBtn.disabled = !boxes.some(b => b.aiGenerated);
       render();
+      updateUndoState();
       return;
     }
   }
+  updateUndoState();
 }
+undoBtn.onclick = undo;
 
 // ---- ドラッグ操作 ----
 let drag = null; // {mode:'draw'|'move'|'resize', ...}
@@ -1370,9 +1393,9 @@ function buildExportCanvas() {
     c.textBaseline = 'bottom';
     const pad = Math.round(fs * 0.7);
     c.fillStyle = '#00000055';
-    c.fillText('HITBOX_MAKER', out.width - pad + 1, out.height - pad + 1);
+    c.fillText('HITBOX SNAP', out.width - pad + 1, out.height - pad + 1);
     c.fillStyle = '#f2c14ecc';
-    c.fillText('HITBOX_MAKER', out.width - pad, out.height - pad);
+    c.fillText('HITBOX SNAP', out.width - pad, out.height - pad);
   }
   return out;
 }
@@ -1387,7 +1410,7 @@ function buildShareText() {
     return count ? `${type.label}${count}` : '';
   }).filter(Boolean).join(' / ');
   const result = breakdown ? `判定付与!! ${breakdown}` : '画像に格ゲー風の当たり判定を付けてみた！';
-  return `${result}\n#判定メーカー #HITBOXMAKER\nhttps://hitbox.nya3neko2.dev/`;
+  return `${result}\n#HITBOXSNAP\nhttps://hitbox.nya3neko2.dev/`;
 }
 
 function showShareStatus(message) {
@@ -1453,7 +1476,14 @@ home.addEventListener('drop', e => {
   if (f && f.type.startsWith('image/')) loadFile(f);
 });
 // ヘッダーのロゴでトップへ戻る（作業内容は保持）
-document.getElementById('btn-home-return').onclick = () => document.body.classList.remove('editing');
+document.getElementById('btn-home-return').onclick = () => document.body.classList.remove('editing', 'tweaks-open');
+
+const tuneBtn = document.getElementById('btn-tune');
+tuneBtn.onclick = () => {
+  const open = document.body.classList.toggle('tweaks-open');
+  tuneBtn.setAttribute('aria-expanded', String(open));
+  tuneBtn.textContent = open ? '閉じる' : '微調整';
+};
 
 // サンプル画像
 function loadSampleImage() {
@@ -1660,8 +1690,8 @@ function maskToBoxes(mask, gridCount, coverTarget) {
   return rects;
 }
 
-function regenerateBoxes() {
-  snapshot();
+function regenerateBoxes(options = {}) {
+  if (options.preserveUndo !== false) snapshot();
   boxes = boxes.filter(b => !b.aiGenerated);
   const rects = maskToBoxes(maskCache, +aiGridEl.value, aiCoverEl.value / 100);
   for (const rc of rects) boxes.push({ id: nextId++, type: 'hurt', aiGenerated: true, ...rc });
@@ -1672,11 +1702,11 @@ function regenerateBoxes() {
 }
 
 const FUN_MESSAGES = [
-  'キャラクターを目視確認中…',
-  '骨格をスキャン中…',
-  '弱い部分を探しています…',
-  'フレームデータをでっち上げ中…',
-  '食らい判定をペタペタ貼り付け中…',
+  '対戦相手を目視確認中…',
+  '食らい判定を捜索中…',
+  '弱そうな部分を発見中…',
+  'フレームデータを捏造中…',
+  '判定、ちょっと盛っています…',
 ];
 let funTimer = null;
 function startFunMessages() {
@@ -1831,7 +1861,9 @@ async function autoAnnotate() {
     maskBtn.disabled = false;
     backgroundSelect.disabled = false;
     stopFunMessages();
-    regenerateBoxes();
+    regenerateBoxes({ preserveUndo: false });
+    history.length = 0;
+    updateUndoState();
     playFlash();
   } catch (err) {
     console.error(err);
@@ -1858,6 +1890,10 @@ aiClearBtn.onclick = () => {
 };
 
 render();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
 </script>
 
 </body>
