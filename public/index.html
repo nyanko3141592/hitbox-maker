@@ -733,9 +733,9 @@
   </div>
   <p class="fighter-select-title" aria-hidden="true">MATCH EXAMPLES</p>
   <div class="gallery">
-    <figure><span class="sample-no" aria-hidden="true">01</span><img src="samples/cat.jpg" alt="猫パンチに判定が付いた例" loading="lazy"><figcaption>発生4F 猫パンチ</figcaption></figure>
-    <figure><span class="sample-no" aria-hidden="true">02</span><img src="samples/hamster.jpg" alt="ハムスターのキックに判定が付いた例" loading="lazy"><figcaption>空中回し蹴り</figcaption></figure>
-    <figure><span class="sample-no" aria-hidden="true">03</span><img src="samples/fugu.jpg" alt="フグの水ビームに判定が付いた例" loading="lazy"><figcaption>飛び道具（水）</figcaption></figure>
+    <figure><span class="sample-no" aria-hidden="true">01</span><img src="samples/cat.webp" alt="猫パンチに判定が付いた例" loading="lazy" decoding="async"><figcaption>発生4F 猫パンチ</figcaption></figure>
+    <figure><span class="sample-no" aria-hidden="true">02</span><img src="samples/hamster.webp" alt="ハムスターのキックに判定が付いた例" loading="lazy" decoding="async"><figcaption>空中回し蹴り</figcaption></figure>
+    <figure><span class="sample-no" aria-hidden="true">03</span><img src="samples/fugu.webp" alt="フグの水ビームに判定が付いた例" loading="lazy" decoding="async"><figcaption>飛び道具（水）</figcaption></figure>
   </div>
   <footer class="home-footer">
     <button id="btn-terms" class="linklike"><span class="desktop-label">利用規約とプライバシー</span><span class="mobile-label">規約・プライバシー</span></button>
@@ -933,7 +933,6 @@ let backgroundMode = 'original';
 let subjectCutout = null;
 let subjectBounds = null;
 let customBackground = null;
-let customBackgroundUrl = null;
 
 // 画像を読み込んだ作業中は、戻る・更新・タブを閉じる操作で確認を出す。
 // beforeunload の文言はブラウザ側で統一されるため、独自メッセージは指定しない。
@@ -973,12 +972,12 @@ const strokeEl = document.getElementById('stroke');
 opacityEl.oninput = () => {
   fillOpacity = opacityEl.value / 100;
   document.getElementById('opacity-out').textContent = opacityEl.value + '%';
-  render();
+  scheduleRender(false);
 };
 strokeEl.oninput = () => {
   strokeWidth = +strokeEl.value;
   document.getElementById('stroke-out').textContent = strokeEl.value + 'px';
-  render();
+  scheduleRender(false);
 };
 
 // ---- 画像読み込み ----
@@ -1081,14 +1080,19 @@ async function loadFile(file) {
 // ---- 座標変換 ----
 function toImageCoords(e) {
   const r = canvas.getBoundingClientRect();
+  updateDisplayMetrics(r);
   return {
     x: (e.clientX - r.left) * (canvas.width / r.width),
     y: (e.clientY - r.top) * (canvas.height / r.height) - getSceneOffsetY(),
   };
 }
+let canvasDisplayScale = 1;
+function updateDisplayMetrics(rect = canvas.getBoundingClientRect()) {
+  if (rect.width > 0) canvasDisplayScale = canvas.width / rect.width;
+}
+new ResizeObserver(() => updateDisplayMetrics()).observe(canvas);
 function handleSize() {
-  const rw = canvas.getBoundingClientRect().width;
-  return 10 * (rw > 0 ? canvas.width / rw : 1); // 表示上10px相当
+  return 10 * canvasDisplayScale; // 表示上10px相当
 }
 
 // ---- ヒットテスト ----
@@ -1245,8 +1249,10 @@ function drawTrainingBackground(c, w, h) {
 }
 
 function getCoverRect(image, w, h) {
-  const scale = Math.max(w / image.naturalWidth, h / image.naturalHeight);
-  const dw = image.naturalWidth * scale, dh = image.naturalHeight * scale;
+  const iw = image.naturalWidth || image.width;
+  const ih = image.naturalHeight || image.height;
+  const scale = Math.max(w / iw, h / ih);
+  const dw = iw * scale, dh = ih * scale;
   return { x: (w - dw) / 2, y: (h - dh) / 2, w: dw, h: dh };
 }
 
@@ -1300,8 +1306,7 @@ function drawScene(c, uiLayer) {
   c.save();
   c.translate(0, sceneOffsetY);
   if (img) c.drawImage(replacesBackground ? subjectCutout : img, 0, 0);
-  const rw = canvas.getBoundingClientRect().width;
-  const scale = rw > 0 ? canvas.width / rw : 1;
+  const scale = canvasDisplayScale;
   const sw = Math.max(1, Math.round(strokeWidth * scale));
 
   // 同タイプの矩形は結合して1つの歪なシルエットとして描く
@@ -1575,9 +1580,9 @@ tuneBtn.onclick = () => {
 
 // デモ画像（同じ画像が連続しないよう3作例から選ぶ）
 const DEMO_IMAGES = [
-  { src: 'samples/demo-cat.jpg', name: 'demo-cat.jpg' },
-  { src: 'samples/demo-hamster.jpg', name: 'demo-hamster.jpg' },
-  { src: 'samples/demo-fugu.jpg', name: 'demo-fugu.jpg' },
+  { src: 'samples/demo-cat.webp', name: 'demo-cat.webp' },
+  { src: 'samples/demo-hamster.webp', name: 'demo-hamster.webp' },
+  { src: 'samples/demo-fugu.webp', name: 'demo-fugu.webp' },
 ];
 let lastDemoIndex = -1;
 async function loadSampleImage() {
@@ -2030,25 +2035,24 @@ backgroundSelect.onchange = () => {
 };
 
 document.getElementById('btn-background-upload').onclick = requestCustomBackground;
-backgroundInput.onchange = () => {
+backgroundInput.onchange = async () => {
   const file = backgroundInput.files[0];
   backgroundInput.value = '';
   if (!file || !file.type.startsWith('image/')) return;
-  const url = URL.createObjectURL(file);
-  const nextBackground = new Image();
-  nextBackground.onload = () => {
-    if (customBackgroundUrl) URL.revokeObjectURL(customBackgroundUrl);
-    customBackgroundUrl = url;
-    customBackground = nextBackground;
+  try {
+    const prepared = await prepareWorkingImage(file);
+    if (customBackground && typeof customBackground.close === 'function') customBackground.close();
+    customBackground = prepared.image;
     applyBackgroundMode('custom');
-  };
-  nextBackground.onerror = () => URL.revokeObjectURL(url);
-  nextBackground.src = url;
+  } catch (err) {
+    console.error(err);
+    alert('背景画像を読み込めませんでした。別の画像でもう一度お試しください。');
+  }
 };
 
 groundPositionEl.oninput = () => {
   document.getElementById('ground-position-out').textContent = groundPositionEl.value + '%';
-  render();
+  scheduleRender(false);
 };
 
 async function autoAnnotate() {

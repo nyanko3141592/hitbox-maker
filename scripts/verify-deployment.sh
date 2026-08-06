@@ -25,9 +25,9 @@ for expected in \
   '"@type": "WebApplication"' \
   'HITBOX SNAP' \
   'manifest.webmanifest' \
-  'samples/cat.jpg' \
-  'samples/hamster.jpg' \
-  'samples/fugu.jpg' \
+  'samples/cat.webp' \
+  'samples/hamster.webp' \
+  'samples/fugu.webp' \
   '利用規約とプライバシー'; do
   if ! grep --fixed-strings --quiet "$expected" <<<"$homepage"; then
     printf 'Homepage is missing expected content: %s\n' "$expected" >&2
@@ -39,9 +39,15 @@ require_status '/'
 require_status '/samples/cat.jpg'
 require_status '/samples/hamster.jpg'
 require_status '/samples/fugu.jpg'
+require_status '/samples/cat.webp'
+require_status '/samples/hamster.webp'
+require_status '/samples/fugu.webp'
 require_status '/samples/demo-cat.jpg'
 require_status '/samples/demo-hamster.jpg'
 require_status '/samples/demo-fugu.jpg'
+require_status '/samples/demo-cat.webp'
+require_status '/samples/demo-hamster.webp'
+require_status '/samples/demo-fugu.webp'
 require_status '/samples/ogp.jpg'
 require_status '/manifest.webmanifest'
 require_status '/sw.js'

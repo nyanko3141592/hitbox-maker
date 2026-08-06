@@ -1,13 +1,13 @@
-const CACHE_NAME = 'hitbox-snap-v5';
+const CACHE_NAME = 'hitbox-snap-v6';
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
   '/apple-touch-icon.png',
   '/icon-192.png',
   '/icon-512.png',
-  '/samples/cat.jpg',
-  '/samples/hamster.jpg',
-  '/samples/fugu.jpg'
+  '/samples/cat.webp',
+  '/samples/hamster.webp',
+  '/samples/fugu.webp'
 ];
 
 self.addEventListener('install', event => {
