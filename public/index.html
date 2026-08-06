@@ -719,7 +719,7 @@
     <div class="round-status" aria-hidden="true"><span>ROUND 01</span></div>
     <h1 class="logo">HITBOX <span>SNAP</span></h1>
     <p class="tagline">写真を入れたら、判定が付く。</p>
-    <p class="sub">写真を入れたら即判定。背景変更や高精度化も端末内AIで対応。画像はどこにも送信されません。</p>
+    <p class="sub">写真を入れたら即判定。背景変更もモデル不要。画像はどこにも送信されません。</p>
     <div class="cta">
       <button id="btn-home-open" class="primary big">FIGHT! 写真を選ぶ</button>
       <button id="btn-home-sample" class="big">DEMO</button>
@@ -748,7 +748,7 @@
   <h2>利用規約とプライバシー</h2>
   <ol>
     <li><strong>画像はどこにも送信されません。</strong>読み込んだ画像・生成した画像の処理は、すべてあなたのブラウザ内（端末内）で完結します。当サイトはサーバーに画像を保存・送信・収集しません。</li>
-    <li><strong>通常の判定生成にAIモデルのダウンロードは不要です。</strong>背景変更や「高精度AI」を選んだ場合だけ、解析モデルを配信CDNから取得します（画像データは含まれません）。以降はブラウザにキャッシュされます。</li>
+    <li><strong>通常の判定生成と背景変更にAIモデルのダウンロードは不要です。</strong>PCで任意の「高精度AI」を選んだ場合だけ約42MBの解析モデルを配信CDNから取得します（画像データは含まれません）。スマホでは取得しません。</li>
     <li><strong>生成した画像の権利はあなたにあります。</strong>商用・非商用を問わず自由に利用できます。ただし、元画像に第三者の権利（著作権・肖像権など）が含まれる場合の確認と責任は利用者にあります。</li>
     <li><strong>本ツールは無保証で提供されます。</strong>AGPL-3.0ライセンスに基づき現状有姿で提供され、利用によって生じたいかなる損害についても作者は責任を負いません。</li>
     <li><strong>アカウント登録・Cookie・アクセス解析なし。</strong>個人情報は一切収集しません。</li>
@@ -796,7 +796,7 @@
 
     <section>
       <div class="btn-row">
-        <button id="btn-ai" class="primary" disabled>高精度AI</button>
+        <button id="btn-ai" class="primary" disabled>高精度AI（約42MB）</button>
         <button id="btn-mask" disabled>抽出を見る</button>
       </div>
       <div class="row">
@@ -849,7 +849,7 @@
       <details>
         <summary>詳細設定</summary>
         <div class="btn-row" style="margin-bottom:4px;">
-          <button id="btn-ai-clear" disabled>AI分を消す</button>
+          <button id="btn-ai-clear" disabled>自動判定を消す</button>
         </div>
         <div class="row">
           <label for="opacity">塗り</label>
@@ -871,7 +871,7 @@
           <input type="checkbox" id="wm-toggle" checked style="width:20px;height:20px;accent-color:var(--accent);">
           <span class="hint" style="flex:1">書き出しにツール名を入れる</span>
         </div>
-        <div class="row">
+        <div class="row" id="ai-model-row">
           <label for="ai-model">モデル</label>
           <select id="ai-model">
             <option value="isnet_quint8" selected>軽量・高速 (isnet_quint8)</option>
@@ -918,6 +918,8 @@ const backgroundSelect = document.getElementById('background-mode');
 const backgroundUploadRow = document.getElementById('background-upload-row');
 const groundPositionRow = document.getElementById('ground-position-row');
 const groundPositionEl = document.getElementById('ground-position');
+const MOBILE_FAST_MODE = matchMedia('(max-width: 760px), (pointer: coarse)').matches;
+document.getElementById('ai-model-row').hidden = MOBILE_FAST_MODE;
 
 let img = null;
 let boxes = [];          // {id, type, x, y, w, h} 画像ピクセル座標
@@ -1050,8 +1052,9 @@ async function loadFile(file) {
     document.getElementById('btn-x').disabled = false;
     history.length = 0;
     updateUndoState();
-    aiBtn.disabled = false;
-    aiBtn.textContent = '高精度AI';
+    aiBtn.disabled = MOBILE_FAST_MODE;
+    aiBtn.hidden = MOBILE_FAST_MODE;
+    aiBtn.textContent = '高精度AI（約42MB）';
     aiClearBtn.disabled = true;
     maskCache = null;
     maskOverlay = null;
@@ -1610,8 +1613,6 @@ async function getRemover() {
   return removeBackgroundFn;
 }
 
-function warmAiEngine() { getRemover().catch(() => {}); }
-
 async function runSegmentation() {
   const removeBg = await getRemover();
   const baseConfig = {
@@ -1808,8 +1809,8 @@ function quickAnnotate() {
     }
   }
 
-  const fastMask = { data: alpha, w, h };
   keepLargestComponent(alpha, w, h);
+  const fastMask = { data: alpha, w, h };
   let rects = maskToBoxes(fastMask, Math.min(18, +aiGridEl.value), .88);
   if (rects.length === 0) {
     rects = [
@@ -1834,7 +1835,12 @@ function quickAnnotate() {
   history.length = 0;
   updateUndoState();
   aiClearBtn.disabled = boxes.length === 0;
-  setAiStatus(`高速判定 ${rects.length} 個を生成。すぐ保存できます。背景変更は「高精度AI」から。`);
+  maskCache = fastMask;
+  maskOverlay = buildMaskOverlay();
+  subjectCutout = buildSubjectCutout();
+  maskBtn.disabled = false;
+  backgroundSelect.disabled = false;
+  setAiStatus(`高速判定 ${rects.length} 個を生成。モデルDLなしですぐ保存できます。`);
   render();
   playFlash();
 }
@@ -2000,6 +2006,11 @@ groundPositionEl.oninput = () => {
 };
 
 async function autoAnnotate() {
+  if (MOBILE_FAST_MODE) {
+    setAiStatus('スマホは高速モードです。AIモデルのダウンロードは行いません。');
+    return;
+  }
+  if (!confirm('高精度AIモデル（約42MB）をダウンロードします。通信環境によって時間がかかります。続けますか？')) return;
   aiBtn.disabled = true;
   document.getElementById('loading').classList.add('on');
   startFunMessages();
@@ -2026,21 +2037,25 @@ async function autoAnnotate() {
 }
 
 aiBtn.onclick = () => { if (img) autoAnnotate(); };
-aiBtn.addEventListener('pointerdown', warmAiEngine, { once: true });
-document.getElementById('ai-model').onchange = () => { if (img) autoAnnotate(); };
+document.getElementById('ai-model').onchange = () => { if (img && !MOBILE_FAST_MODE) autoAnnotate(); };
 
 aiClearBtn.onclick = () => {
   snapshot();
   boxes = boxes.filter(b => !b.aiGenerated);
   aiClearBtn.disabled = true;
-  setAiStatus('AI生成分を削除しました。');
+  setAiStatus('自動生成した判定を削除しました。');
   render();
 };
 
 render();
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
+      registration.update();
+    } catch { /* オフライン利用は次回登録時に再試行 */ }
+  });
 }
 </script>
 
