@@ -79,14 +79,17 @@
     background: var(--panel);
     flex: none;
   }
-  header h1 {
+  header .header-brand {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 1rem;
     letter-spacing: .18em;
     color: var(--accent);
     text-transform: uppercase;
+    padding: 0;
+    border: 0;
+    background: none;
   }
-  header h1 span { color: var(--text-dim); font-weight: 400; }
+  header .header-brand span { color: var(--text-dim); font-weight: 400; }
   header .spacer { flex: 1; }
 
   button {
@@ -574,13 +577,41 @@
     }
     .home-footer { gap: 14px; font-size: .7rem; }
 
-    header { gap: 6px; padding: 8px 10px; position: sticky; top: 0; z-index: 20; }
-    header h1 { font-size: .8rem; letter-spacing: .1em; }
-    header button { padding: 9px 10px; font-size: .85rem; flex: none; }
-    main { flex-direction: column; overflow: visible; }
+    header {
+      position: fixed;
+      inset: auto 0 0;
+      z-index: 20;
+      gap: 4px;
+      padding: 6px 6px max(6px, env(safe-area-inset-bottom));
+      border-top: 1px solid var(--line);
+      border-bottom: none;
+    }
+    header .spacer { display: none; }
+    header .header-brand {
+      flex: 1;
+      min-width: 0;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0;
+    }
+    header .header-brand::after { content: "HOME"; font-size: .68rem; }
+    header button {
+      flex: 1;
+      min-width: 0;
+      min-height: 44px;
+      padding: 7px 3px;
+      font-size: .72rem;
+    }
+    main {
+      flex-direction: column;
+      overflow: visible;
+      padding-bottom: calc(56px + env(safe-area-inset-bottom));
+    }
     #stage-wrap {
       flex: none;
-      height: 52vh;
+      height: 50dvh;
       min-height: 260px;
       padding: 8px;
     }
@@ -591,12 +622,23 @@
       border-top: 1px solid var(--line);
       overflow: visible;
     }
-    aside section { padding: 10px 12px; }
+    aside section { padding: 12px; }
+    aside .row { align-items: center; }
+    aside .row label { width: 4.8em; }
+    aside select, aside .row button { min-height: 44px; }
     .type-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
     .type-btn { flex-direction: column; gap: 4px; padding: 8px 4px; font-size: .75rem; text-align: center; }
     .type-btn, .box-item button, button { min-height: 42px; } /* タッチターゲット */
     .box-item { padding: 10px; }
     input[type="range"] { height: 32px; }
+    #share-panel {
+      border-top: 3px solid var(--accent);
+      background: var(--panel-2);
+    }
+    #share-panel .btn-row { display: grid; grid-template-columns: 1fr 1fr; }
+    #share-panel .btn-row button { width: 100%; }
+    #share-status:empty { display: none; }
+    .ugc-links { justify-content: space-between; }
     .hint kbd { display: inline; }
   }
   @media (max-width: 760px) and (max-height: 680px) {
@@ -654,7 +696,7 @@
 </dialog>
 
 <header>
-  <h1>Hitbox<span>_</span>Maker</h1>
+  <button id="btn-home-return" class="header-brand" aria-label="トップへ戻る">Hitbox<span>_</span>Maker</button>
   <div class="spacer"></div>
   <button id="btn-open">開く</button>
   <button id="btn-clear">消去</button>
@@ -719,13 +761,6 @@
       <p class="hint" id="ai-status">画像を入れると自動で食らい判定が付きます。初回のみAIモデルをダウンロード。</p>
     </section>
 
-    <section style="flex:1">
-      <details>
-        <summary>レイヤー</summary>
-        <div id="box-list"></div>
-      </details>
-    </section>
-
     <section id="share-panel">
       <h2>作品をシェア</h2>
       <p class="hint">保存した画像を投稿して、みんなの判定と比べてみよう。</p>
@@ -738,6 +773,13 @@
         <a href="https://x.com/search?q=%23%E5%88%A4%E5%AE%9A%E3%83%A1%E3%83%BC%E3%82%AB%E3%83%BC&src=typed_query" target="_blank" rel="noopener">#判定メーカーを見る ↗</a>
         <a href="https://github.com/nyanko3141592/hitbox-maker/issues/new" target="_blank" rel="noopener">改善アイデアを送る ↗</a>
       </div>
+    </section>
+
+    <section style="flex:1">
+      <details>
+        <summary>レイヤー</summary>
+        <div id="box-list"></div>
+      </details>
     </section>
 
     <section>
@@ -1381,10 +1423,7 @@ home.addEventListener('drop', e => {
   if (f && f.type.startsWith('image/')) loadFile(f);
 });
 // ヘッダーのロゴでトップへ戻る（作業内容は保持）
-const headerLogo = document.querySelector('header h1');
-headerLogo.style.cursor = 'pointer';
-headerLogo.title = 'トップへ戻る';
-headerLogo.onclick = () => document.body.classList.remove('editing');
+document.getElementById('btn-home-return').onclick = () => document.body.classList.remove('editing');
 
 // サンプル画像
 function loadSampleImage() {
