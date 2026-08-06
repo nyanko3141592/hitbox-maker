@@ -779,6 +779,19 @@ let currentType = 'hit';
 let selectedId = null;
 let fillOpacity = 0.30;
 let strokeWidth = 3;
+let lastBlob = null;   // 現在の画像の元Blob（imglyに渡す）
+
+// 画像を読み込んだ作業中は、戻る・更新・タブを閉じる操作で確認を出す。
+// beforeunload の文言はブラウザ側で統一されるため、独自メッセージは指定しない。
+window.addEventListener('beforeunload', e => {
+  if (!lastBlob) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+function confirmImageReplacement() {
+  return !lastBlob || confirm('現在の画像と判定が消えます。新しい画像に置き換えますか？');
+}
 
 // ---- 判定タイプUI ----
 const typeGrid = document.getElementById('type-grid');
@@ -834,6 +847,7 @@ window.addEventListener('paste', e => {
 });
 
 function loadFile(file) {
+  if (!confirmImageReplacement()) return;
   document.body.classList.add('editing'); // トップ画面→作成画面へ
   lastBlob = file;
   const url = URL.createObjectURL(file);
@@ -1250,7 +1264,6 @@ const aiCoverEl = document.getElementById('ai-cover');
 const IMGLY_URL = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm';
 
 let removeBackgroundFn = null;
-let lastBlob = null;   // 現在の画像の元Blob（imglyに渡す）
 let maskCache = null;  // {data: Uint8ClampedArray(アルファ), w, h} 現在の画像のマスク
 let maskOverlay = null; // デバッグ表示用のマスク着色キャンバス
 let showMask = false;
