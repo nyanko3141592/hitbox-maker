@@ -2,7 +2,7 @@
 
 画像を入れるだけで、格ゲー風の当たり判定が付く Web ツール。端末内AIで被写体を高精度に抽出して食らい判定（青）を自動生成する。攻撃（赤）/ 投げ（紫）/ 押し合い（緑）の手描き追加、背景変更、合成PNGの保存・コピー・共有に対応。
 
-画像の解析はすべて端末内（WASM）で完結し、サーバーには一切送信されない。
+画像の解析はすべて端末内（WebGPUまたはWASM）で完結し、サーバーには一切送信されない。
 初回に約42MBの軽量QUINT8モデルを取得し、PCではWebGPU優先、スマホでは安定性を優先してCPU/WASMで必ず被写体を抽出する。モデルはブラウザにキャッシュされる。モバイルの抽出でメモリが不足した場合は、キュピーン猫（InspirationCat）と同様に1024→768→512pxへ段階的に縮小して再試行する。処理中はダウンロード・推論の進捗率を表示する。スマホのドラッグ描画はフレーム単位でまとめ、元画像と背景の合成結果をキャッシュする。
 
 ## 使い方
@@ -28,9 +28,13 @@
 public/
 ├── index.html
 ├── apple-touch-icon.png
+├── icon-192.png
+├── icon-512.png
 ├── manifest.webmanifest
+├── robots.txt
+├── sitemap.xml
 ├── sw.js
-└── samples/
+└── samples/            # 表示用WebP、互換用JPEG、OGP画像
 ```
 
 ローカル確認は:
@@ -55,6 +59,8 @@ SEO・OGPの運用は [docs/SEO.md](docs/SEO.md) を参照してください。
 
 作品共有から改善提案へつなげるUGC導線は [docs/UGC.md](docs/UGC.md) にまとめています。
 
+モデル取得、モバイルのメモリ対策、描画最適化、問題発生時の確認方法は [docs/PERFORMANCE.md](docs/PERFORMANCE.md) を参照してください。
+
 ## 本番確認
 
 ```bash
@@ -77,4 +83,4 @@ bash scripts/verify-deployment.sh https://example.workers.dev
 |---|---|---|
 | [@imgly/background-removal](https://github.com/imgly/background-removal-js) | AGPL-3.0 | CDN (jsdelivr) から動的import。本プロジェクトのAGPL採用の理由 |
 | isnet (DIS) モデル | Apache-2.0 | imglyパッケージ経由で取得 |
-| `samples/*.jpg` | 本プロジェクトの作例 | 本ツールで生成したサンプル出力 |
+| `samples/*.{jpg,webp}` | 本プロジェクトの作例 | WebPを表示・デモに使用し、JPEGは既存URL互換用に保持 |
