@@ -301,7 +301,7 @@
     100% { opacity: 0; transform: scale(1.06); }
   }
   @media (prefers-reduced-motion: reduce) {
-    #flash.go { animation: none; opacity: 1; transition: opacity .2s; }
+    #flash.go { animation: none; opacity: 0; }
   }
 
   /* ---- トップ画面 ---- */
@@ -2191,11 +2191,15 @@ function startFunMessages() {
 }
 function stopFunMessages() { clearInterval(funTimer); funTimer = null; }
 
+let flashTimer = null;
 function playFlash() {
   const f = document.getElementById('flash');
+  clearTimeout(flashTimer);
   f.classList.remove('go');
   void f.offsetWidth; // アニメ再スタート
   f.classList.add('go');
+  // animationendが発火しない設定・ブラウザでも必ず閉じる。
+  flashTimer = setTimeout(() => f.classList.remove('go'), 1200);
 }
 
 function buildMaskOverlay() {
