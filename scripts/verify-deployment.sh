@@ -23,6 +23,8 @@ for expected in \
   '<link rel="canonical" href="' \
   '<meta name="twitter:image" content="' \
   '"@type": "WebApplication"' \
+  'HITBOX SNAP' \
+  'manifest.webmanifest' \
   'samples/cat.jpg' \
   'samples/hamster.jpg' \
   'samples/fugu.jpg' \
@@ -37,7 +39,12 @@ require_status '/'
 require_status '/samples/cat.jpg'
 require_status '/samples/hamster.jpg'
 require_status '/samples/fugu.jpg'
+require_status '/samples/demo-cat.jpg'
+require_status '/samples/demo-hamster.jpg'
+require_status '/samples/demo-fugu.jpg'
 require_status '/samples/ogp.jpg'
+require_status '/manifest.webmanifest'
+require_status '/sw.js'
 require_status '/robots.txt'
 require_status '/sitemap.xml'
 printf 'Deployment checks passed for %s\n' "$site_url"

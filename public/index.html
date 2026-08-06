@@ -1504,20 +1504,28 @@ tuneBtn.onclick = () => {
   tuneBtn.textContent = open ? '閉じる' : '微調整';
 };
 
-// サンプル画像
-function loadSampleImage() {
-  const c = document.createElement('canvas');
-  c.width = 800; c.height = 600;
-  const g = c.getContext('2d');
-  g.fillStyle = '#e8d8c8'; g.fillRect(0, 0, 800, 600);
-  g.fillStyle = '#2a3245';
-  g.beginPath(); g.arc(380, 150, 55, 0, 7); g.fill();          // 頭
-  g.fillRect(325, 200, 110, 190);                               // 胴
-  g.fillRect(435, 225, 180, 42);                                // 突き出した腕
-  g.fillRect(285, 225, 40, 120);                                // 後ろ腕
-  g.fillRect(335, 390, 38, 150);                                // 脚
-  g.fillRect(395, 390, 38, 150);
-  c.toBlob(b => loadFile(new File([b], 'sample.png', { type: 'image/png' })), 'image/png');
+// デモ画像（同じ画像が連続しないよう3作例から選ぶ）
+const DEMO_IMAGES = [
+  { src: 'samples/demo-cat.jpg', name: 'demo-cat.jpg' },
+  { src: 'samples/demo-hamster.jpg', name: 'demo-hamster.jpg' },
+  { src: 'samples/demo-fugu.jpg', name: 'demo-fugu.jpg' },
+];
+let lastDemoIndex = -1;
+async function loadSampleImage() {
+  let index;
+  do index = Math.floor(Math.random() * DEMO_IMAGES.length);
+  while (index === lastDemoIndex && DEMO_IMAGES.length > 1);
+  lastDemoIndex = index;
+  const demo = DEMO_IMAGES[index];
+  try {
+    const response = await fetch(demo.src);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const blob = await response.blob();
+    loadFile(new File([blob], demo.name, { type: blob.type || 'image/jpeg' }));
+  } catch (err) {
+    console.error(err);
+    alert('デモ画像を読み込めませんでした。通信状態を確認して、もう一度お試しください。');
+  }
 }
 document.getElementById('btn-sample').onclick = e => {
   e.stopPropagation(); // dropzoneのclick（ファイル選択）を抑止
