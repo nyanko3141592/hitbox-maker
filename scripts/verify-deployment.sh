@@ -38,6 +38,7 @@ require_status '/samples/cat.jpg'
 require_status '/samples/hamster.jpg'
 require_status '/samples/fugu.jpg'
 require_status '/samples/ogp.jpg'
+require_status '/backgrounds/street-stage.webp'
 require_status '/robots.txt'
 require_status '/sitemap.xml'
 printf 'Deployment checks passed for %s\n' "$site_url"

@@ -698,7 +698,7 @@
         <select id="background-mode" disabled>
           <option value="original" selected>元画像</option>
           <option value="training">トレーニングルーム</option>
-          <option value="street">ストリートステージ</option>
+          <option value="street">ストリートステージ（生成背景）</option>
         </select>
       </div>
       <p class="hint" id="ai-status">画像を入れると自動で食らい判定が付きます。初回のみAIモデルをダウンロード。</p>
@@ -792,6 +792,10 @@ let lastBlob = null;   // 現在の画像の元Blob（imglyに渡す）
 let backgroundMode = 'original';
 let subjectCutout = null;
 let subjectBounds = null;
+const STREET_GROUND_RATIO = 0.682;
+const streetBackground = new Image();
+streetBackground.src = 'backgrounds/street-stage.webp';
+streetBackground.onload = () => { if (backgroundMode === 'street') render(); };
 
 // 画像を読み込んだ作業中は、戻る・更新・タブを閉じる操作で確認を出す。
 // beforeunload の文言はブラウザ側で統一されるため、独自メッセージは指定しない。
@@ -899,7 +903,7 @@ function toImageCoords(e) {
   const r = canvas.getBoundingClientRect();
   return {
     x: (e.clientX - r.left) * (canvas.width / r.width),
-    y: (e.clientY - r.top) * (canvas.height / r.height),
+    y: (e.clientY - r.top) * (canvas.height / r.height) - getSceneOffsetY(),
   };
 }
 function handleSize() {
@@ -1054,46 +1058,34 @@ function drawTrainingBackground(c, w, h) {
   c.stroke();
 }
 
+function getCoverRect(image, w, h) {
+  const scale = Math.max(w / image.naturalWidth, h / image.naturalHeight);
+  const dw = image.naturalWidth * scale, dh = image.naturalHeight * scale;
+  return { x: (w - dw) / 2, y: (h - dh) / 2, w: dw, h: dh };
+}
+
 function drawStreetBackground(c, w, h) {
-  const horizon = h * .58;
-  c.fillStyle = '#d8894d';
-  c.fillRect(0, 0, w, horizon);
+  c.fillStyle = '#211c2d';
+  c.fillRect(0, 0, w, h);
+  if (!streetBackground.complete || !streetBackground.naturalWidth) return;
+  const rect = getCoverRect(streetBackground, w, h);
+  c.drawImage(streetBackground, rect.x, rect.y, rect.w, rect.h);
+}
 
-  c.fillStyle = '#29313d';
-  c.fillRect(0, h * .16, w * .2, horizon - h * .16);
-  c.fillRect(w * .17, h * .28, w * .2, horizon - h * .28);
-  c.fillRect(w * .7, h * .2, w * .3, horizon - h * .2);
-  c.fillStyle = '#48515e';
-  c.fillRect(w * .4, h * .34, w * .27, horizon - h * .34);
-
-  c.fillStyle = '#f2c14e';
-  const windowSize = Math.max(4, Math.round(Math.min(w, h) / 35));
-  for (let x = windowSize; x < w; x += windowSize * 3) {
-    c.fillRect(x, h * .3, windowSize, windowSize * .55);
+function getGroundY() {
+  if (backgroundMode === 'training') return canvas.height * .72;
+  if (backgroundMode === 'street' && streetBackground.complete && streetBackground.naturalWidth) {
+    const rect = getCoverRect(streetBackground, canvas.width, canvas.height);
+    return rect.y + rect.h * STREET_GROUND_RATIO;
   }
+  return canvas.height;
+}
 
-  c.fillStyle = '#4a4d55';
-  c.fillRect(0, horizon, w, h - horizon);
-  c.fillStyle = '#262a31';
-  c.beginPath();
-  c.moveTo(w * .17, h); c.lineTo(w * .42, horizon);
-  c.lineTo(w * .58, horizon); c.lineTo(w * .83, h);
-  c.closePath();
-  c.fill();
-
-  c.strokeStyle = '#d8d2c7';
-  c.lineWidth = Math.max(2, Math.round(Math.min(w, h) / 180));
-  c.setLineDash([Math.max(12, w * .04), Math.max(10, w * .025)]);
-  c.beginPath(); c.moveTo(w / 2, h); c.lineTo(w / 2, horizon); c.stroke();
-  c.setLineDash([]);
-
-  c.fillStyle = '#161b22';
-  const crowdY = horizon - h * .025;
-  for (let x = w * .04; x < w; x += w * .065) {
-    const head = Math.max(4, Math.min(w, h) * .012);
-    c.beginPath(); c.arc(x, crowdY - head * 2.2, head, 0, Math.PI * 2); c.fill();
-    c.fillRect(x - head * .75, crowdY - head * 1.3, head * 1.5, head * 2.2);
-  }
+function getSceneOffsetY() {
+  if (backgroundMode === 'original' || !subjectBounds) return 0;
+  const bottom = subjectBounds.y + subjectBounds.h;
+  const desired = getGroundY() - bottom;
+  return Math.max(-subjectBounds.y, Math.min(canvas.height - bottom, desired));
 }
 
 function drawSelectedBackground(c, w, h) {
@@ -1101,7 +1093,7 @@ function drawSelectedBackground(c, w, h) {
   if (backgroundMode === 'street') drawStreetBackground(c, w, h);
 }
 
-function drawSubjectShadow(c) {
+function drawSubjectShadow(c, offsetY) {
   if (!subjectBounds) return;
   const width = Math.max(18, subjectBounds.w * .58);
   const height = Math.max(5, width * .09);
@@ -1109,22 +1101,22 @@ function drawSubjectShadow(c) {
   c.globalAlpha = .34;
   c.fillStyle = '#000';
   c.beginPath();
-  c.ellipse(subjectBounds.x + subjectBounds.w / 2, subjectBounds.y + subjectBounds.h, width / 2, height / 2, 0, 0, Math.PI * 2);
+  c.ellipse(subjectBounds.x + subjectBounds.w / 2, subjectBounds.y + subjectBounds.h + offsetY, width / 2, height / 2, 0, 0, Math.PI * 2);
   c.fill();
   c.restore();
 }
 
 function drawScene(c, uiLayer) {
   c.clearRect(0, 0, canvas.width, canvas.height);
-  if (img) {
-    if (backgroundMode === 'original' || !subjectCutout) {
-      c.drawImage(img, 0, 0);
-    } else {
-      drawSelectedBackground(c, canvas.width, canvas.height);
-      drawSubjectShadow(c);
-      c.drawImage(subjectCutout, 0, 0);
-    }
+  const replacesBackground = img && backgroundMode !== 'original' && subjectCutout;
+  const sceneOffsetY = replacesBackground ? getSceneOffsetY() : 0;
+  if (replacesBackground) {
+    drawSelectedBackground(c, canvas.width, canvas.height);
+    drawSubjectShadow(c, sceneOffsetY);
   }
+  c.save();
+  c.translate(0, sceneOffsetY);
+  if (img) c.drawImage(replacesBackground ? subjectCutout : img, 0, 0);
   const rw = canvas.getBoundingClientRect().width;
   const scale = rw > 0 ? canvas.width / rw : 1;
   const sw = Math.max(1, Math.round(strokeWidth * scale));
@@ -1187,6 +1179,7 @@ function drawScene(c, uiLayer) {
       }
     }
   }
+  c.restore();
 }
 
 function render() {

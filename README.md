@@ -1,6 +1,6 @@
 # Hitbox Maker（判定メーカー）
 
-画像を入れるだけで、格ゲー風の当たり判定が付く Web ツール。AIがブラウザ内でキャラを抜き出して食らい判定（青）を自動生成し、攻撃（赤）/ 投げ（紫）/ 押し合い（緑）は手描きで足せる。トレーニングルーム・ストリートステージへの背景変更と、合成PNGの保存・コピー・共有に対応。
+画像を入れるだけで、格ゲー風の当たり判定が付く Web ツール。AIがブラウザ内でキャラを抜き出して食らい判定（青）を自動生成し、攻撃（赤）/ 投げ（紫）/ 押し合い（緑）は手描きで足せる。トレーニングルーム・画像生成したストリートステージへの背景変更、床ラインへの自動接地、合成PNGの保存・コピー・共有に対応。
 
 画像の解析はすべて端末内（WASM）で完結し、サーバーには一切送信されない。
 
@@ -72,3 +72,4 @@ bash scripts/verify-deployment.sh https://example.workers.dev
 | [@imgly/background-removal](https://github.com/imgly/background-removal-js) | AGPL-3.0 | CDN (jsdelivr) から動的import。本プロジェクトのAGPL採用の理由 |
 | isnet (DIS) モデル | Apache-2.0 | imglyパッケージ経由で取得 |
 | `samples/*.jpg` | 本プロジェクトの作例 | 本ツールで生成したサンプル出力 |
+| `backgrounds/street-stage.webp` | 本プロジェクトの生成アセット | OpenAIの画像生成機能で作成したオリジナル背景 |
