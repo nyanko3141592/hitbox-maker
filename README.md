@@ -20,17 +20,42 @@
 
 ## 開発
 
-ビルド不要の静的サイト（`index.html` 1枚）。ローカル確認は:
+ビルド不要の静的サイトです。公開対象は `public/` 配下に限定しています。
 
-```bash
-python3 -m http.server 8000
+```text
+public/
+├── index.html
+├── apple-touch-icon.png
+└── samples/
 ```
 
-## デプロイ (Cloudflare Pages)
+ローカル確認は:
 
-- ダッシュボードでこのリポジトリを接続し、Build command なし / Output directory `/` で設定
-- または `npx wrangler pages deploy . --project-name=hitbox-maker`
-- デプロイ先のドメインが変わる場合は `index.html` の `og:image` / `og:url` を書き換えること
+```bash
+python3 -m http.server 8000 --directory public
+```
+
+## デプロイ (Cloudflare Workers)
+
+Cloudflare Workers の静的アセット配信を使用します。`wrangler.jsonc` は `public/` のみを配信対象にしており、Git メタデータや運用ドキュメントは公開されません。
+
+```bash
+npx wrangler deploy
+```
+
+本番は Workers Builds で GitHub の `main` ブランチと連携済みです。以後は `main` への push で自動デプロイされます。詳細は [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) を参照してください。
+
+## 本番確認
+
+```bash
+bash scripts/verify-deployment.sh
+```
+
+別の環境を確認する場合はURLを指定します。
+
+```bash
+bash scripts/verify-deployment.sh https://example.workers.dev
+```
 
 ## ライセンス
 
