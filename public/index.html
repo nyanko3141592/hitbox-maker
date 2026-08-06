@@ -311,6 +311,7 @@
   }
   body.editing #home { display: none; }
   #home .hero { text-align: center; max-width: 640px; }
+  #home .round-status, #home .fighter-select-title { display: none; }
   #home .logo {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: clamp(1.8rem, 6vw, 3rem);
@@ -457,23 +458,99 @@
       min-height: 100dvh;
       height: 100dvh;
       justify-content: center;
-      gap: 14px;
+      gap: 10px;
       overflow: hidden;
       padding:
         max(14px, env(safe-area-inset-top))
         12px
         max(14px, env(safe-area-inset-bottom));
     }
-    #home .hero { width: 100%; }
-    #home .logo { font-size: clamp(1.55rem, 8vw, 2rem); line-height: 1.1; }
-    #home .tagline { margin-top: 10px; font-size: 1rem; }
+    #home .hero {
+      width: 100%;
+      padding: 12px 10px 14px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent);
+      background: var(--panel);
+      clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+    }
+    #home .round-status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: .64rem;
+      font-weight: 700;
+      color: var(--accent);
+      text-transform: uppercase;
+      font-variant-numeric: tabular-nums;
+    }
+    #home .round-status::after {
+      content: "READY";
+      padding: 2px 6px;
+      color: #14100a;
+      background: var(--accent);
+    }
+    #home .logo {
+      font-size: clamp(1.55rem, 8vw, 2rem);
+      line-height: 1;
+      text-shadow: 3px 3px 0 #000;
+      transform: skewX(-5deg);
+    }
+    #home .tagline { margin-top: 9px; font-size: .92rem; }
     #home .sub { display: none; }
-    #home .cta { margin-top: 16px; gap: 8px; flex-wrap: nowrap; }
-    #home button.big { flex: 1; min-width: 0; padding: 11px 8px; font-size: .9rem; }
-    #home .drop-hint { margin-top: 9px; font-size: .72rem; }
+    #home .cta { margin-top: 13px; gap: 7px; flex-wrap: nowrap; }
+    #home button.big {
+      flex: 1;
+      min-width: 0;
+      padding: 10px 7px;
+      border-radius: 0;
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: .8rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+    }
+    #home .drop-hint { margin-top: 8px; font-size: .68rem; }
+    #home .fighter-select-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      color: var(--accent);
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: .68rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+    #home .fighter-select-title::after {
+      content: "";
+      height: 1px;
+      flex: 1;
+      background: var(--accent);
+      opacity: .55;
+    }
     #home .gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-    #home .gallery figure { min-width: 0; border-radius: 6px; }
+    #home .gallery figure {
+      position: relative;
+      min-width: 0;
+      border-radius: 0;
+      border-bottom: 3px solid var(--accent);
+      clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
+    }
     #home .gallery img { aspect-ratio: 1 / 1; }
+    #home .sample-no {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      padding: 2px 5px;
+      color: #14100a;
+      background: var(--accent);
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: .6rem;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+    }
     #home .gallery figcaption {
       min-height: 2.7em;
       padding: 6px;
@@ -519,7 +596,9 @@
     .hint kbd { display: inline; }
   }
   @media (max-width: 760px) and (max-height: 680px) {
-    #home { gap: 9px; }
+    #home { gap: 7px; }
+    #home .hero { padding-block: 8px 10px; }
+    #home .round-status { margin-bottom: 5px; }
     #home .tagline { margin-top: 7px; }
     #home .cta { margin-top: 10px; }
     #home .trust { display: none; }
@@ -530,12 +609,13 @@
 <body>
 <div id="home">
   <div class="hero">
+    <div class="round-status" aria-hidden="true"><span>ROUND 01</span></div>
     <h1 class="logo">HITBOX<span>_</span>MAKER</h1>
     <p class="tagline">画像を入れるだけで、格ゲー風の判定が付く。</p>
     <p class="sub">AIがキャラを抜き出して食らい判定を自動生成。解析はぜんぶ端末の中、どこにも送信されません。</p>
     <div class="cta">
-      <button id="btn-home-open" class="primary big">画像を選んで作る</button>
-      <button id="btn-home-sample" class="big">サンプルで試す</button>
+      <button id="btn-home-open" class="primary big">FIGHT! 画像を選ぶ</button>
+      <button id="btn-home-sample" class="big">DEMO MATCH</button>
     </div>
     <p class="drop-hint">ここに画像をドロップ / <kbd>⌘V</kbd> ペーストでもOK</p>
     <ul class="trust">
@@ -544,10 +624,11 @@
       <li>🆓 無料・登録不要</li>
     </ul>
   </div>
+  <p class="fighter-select-title" aria-hidden="true">SELECT YOUR FIGHTER</p>
   <div class="gallery">
-    <figure><img src="samples/cat.jpg" alt="猫パンチに判定が付いた例" loading="lazy"><figcaption>発生4F 猫パンチ</figcaption></figure>
-    <figure><img src="samples/hamster.jpg" alt="ハムスターのキックに判定が付いた例" loading="lazy"><figcaption>空中回し蹴り</figcaption></figure>
-    <figure><img src="samples/fugu.jpg" alt="フグの水ビームに判定が付いた例" loading="lazy"><figcaption>飛び道具（水）</figcaption></figure>
+    <figure><span class="sample-no" aria-hidden="true">01</span><img src="samples/cat.jpg" alt="猫パンチに判定が付いた例" loading="lazy"><figcaption>発生4F 猫パンチ</figcaption></figure>
+    <figure><span class="sample-no" aria-hidden="true">02</span><img src="samples/hamster.jpg" alt="ハムスターのキックに判定が付いた例" loading="lazy"><figcaption>空中回し蹴り</figcaption></figure>
+    <figure><span class="sample-no" aria-hidden="true">03</span><img src="samples/fugu.jpg" alt="フグの水ビームに判定が付いた例" loading="lazy"><figcaption>飛び道具（水）</figcaption></figure>
   </div>
   <footer class="home-footer">
     <button id="btn-terms" class="linklike">利用規約とプライバシー</button>
