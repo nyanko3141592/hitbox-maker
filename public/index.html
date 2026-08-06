@@ -873,9 +873,9 @@
         <div class="row">
           <label for="ai-model">モデル</label>
           <select id="ai-model">
-            <option value="isnet_fp16" selected>標準 (isnet_fp16)</option>
+            <option value="isnet_quint8" selected>軽量・高速 (isnet_quint8)</option>
+            <option value="isnet_fp16">標準 (isnet_fp16)</option>
             <option value="isnet">高精度 (isnet)</option>
-            <option value="isnet_quint8">軽量 (isnet_quint8)</option>
           </select>
         </div>
       </details>
@@ -997,19 +997,49 @@ window.addEventListener('paste', e => {
   }
 });
 
-function loadFile(file) {
+const MAX_IMAGE_DIMENSION = 2048;
+
+async function prepareWorkingImage(file) {
+  const source = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const longestSide = Math.max(source.width, source.height);
+  if (longestSide <= MAX_IMAGE_DIMENSION) return { image: source, blob: file, resized: false };
+
+  const scale = MAX_IMAGE_DIMENSION / longestSide;
+  const width = Math.max(1, Math.round(source.width * scale));
+  const height = Math.max(1, Math.round(source.height * scale));
+  const work = document.createElement('canvas');
+  work.width = width;
+  work.height = height;
+  work.getContext('2d').drawImage(source, 0, 0, width, height);
+  const outputType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) ? file.type : 'image/jpeg';
+  const blob = await new Promise((resolve, reject) => {
+    work.toBlob(result => result ? resolve(result) : reject(new Error('画像の縮小に失敗しました。')), outputType, 0.9);
+  });
+  source.close();
+  work.width = 1;
+  work.height = 1;
+  const image = await createImageBitmap(blob);
+  return {
+    image,
+    blob: new File([blob], file.name || 'image', { type: outputType }),
+    resized: true,
+  };
+}
+
+async function loadFile(file) {
   if (!confirmImageReplacement()) return;
-  document.body.classList.add('editing'); // トップ画面→作成画面へ
-  document.body.classList.remove('tweaks-open');
-  document.getElementById('btn-tune').setAttribute('aria-expanded', 'false');
-  document.getElementById('btn-tune').textContent = '微調整';
-  lastBlob = file;
-  const url = URL.createObjectURL(file);
-  const im = new Image();
-  im.onload = () => {
-    img = im;
-    canvas.width = im.naturalWidth;
-    canvas.height = im.naturalHeight;
+  warmAiEngine();
+  try {
+    const prepared = await prepareWorkingImage(file);
+    if (img && typeof img.close === 'function') img.close();
+    img = prepared.image;
+    lastBlob = prepared.blob;
+    document.body.classList.add('editing'); // トップ画面→作成画面へ
+    document.body.classList.remove('tweaks-open');
+    document.getElementById('btn-tune').setAttribute('aria-expanded', 'false');
+    document.getElementById('btn-tune').textContent = '微調整';
+    canvas.width = img.width;
+    canvas.height = img.height;
     boxes = [];
     selectedId = null;
     dropzone.classList.add('hidden');
@@ -1035,10 +1065,11 @@ function loadFile(file) {
     maskBtn.disabled = true;
     maskBtn.textContent = '抽出部分を見る';
     render();
-    URL.revokeObjectURL(url);
     autoAnnotate(); // 入れたら勝手に食らい判定
-  };
-  im.src = url;
+  } catch (err) {
+    console.error(err);
+    alert('画像を読み込めませんでした。別の画像でもう一度お試しください。');
+  }
 }
 
 // ---- 座標変換 ----
@@ -1547,12 +1578,13 @@ const aiStatus = document.getElementById('ai-status');
 const aiGridEl = document.getElementById('ai-grid');
 const aiCoverEl = document.getElementById('ai-cover');
 
-const IMGLY_URL = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.5.5/+esm';
+const IMGLY_URL = 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.7.0/+esm';
 
 let removeBackgroundFn = null;
 let maskCache = null;  // {data: Uint8ClampedArray(アルファ), w, h} 現在の画像のマスク
 let maskOverlay = null; // デバッグ表示用のマスク着色キャンバス
 let showMask = false;
+let webGpuDisabled = false;
 
 aiGridEl.oninput = () => {
   document.getElementById('ai-grid-out').textContent = aiGridEl.value;
@@ -1577,16 +1609,36 @@ async function getRemover() {
   return removeBackgroundFn;
 }
 
+function warmAiEngine() { getRemover().catch(() => {}); }
+
+for (const id of ['btn-home-open', 'btn-home-sample', 'btn-open']) {
+  document.getElementById(id).addEventListener('pointerdown', warmAiEngine, { once: true });
+}
+stageWrap.addEventListener('dragenter', warmAiEngine, { once: true });
+
 async function runSegmentation() {
   const removeBg = await getRemover();
-  const fgBlob = await removeBg(lastBlob, {
+  const baseConfig = {
     model: document.getElementById('ai-model').value,
     progress: (key, current, total) => {
       if (key.startsWith('fetch') && total) {
         setAiStatus(`モデルをダウンロード中… ${Math.round(current / total * 100)}% (初回のみ)`);
       }
     },
-  });
+  };
+  let fgBlob;
+  if (navigator.gpu && !webGpuDisabled) {
+    try {
+      fgBlob = await removeBg(lastBlob, { ...baseConfig, device: 'gpu' });
+    } catch (gpuError) {
+      webGpuDisabled = true;
+      console.warn('WebGPUでの解析に失敗したためCPUへ切り替えます。', gpuError);
+      setAiStatus('CPUモードへ切り替え中…');
+      fgBlob = await removeBg(lastBlob, { ...baseConfig, device: 'cpu' });
+    }
+  } else {
+    fgBlob = await removeBg(lastBlob, { ...baseConfig, device: 'cpu' });
+  }
   // 前景PNGのアルファをマスクとして取り出す
   const bmp = await createImageBitmap(fgBlob);
   const mc = document.createElement('canvas');
@@ -1904,9 +1956,6 @@ async function autoAnnotate() {
 
 aiBtn.onclick = () => { if (img) autoAnnotate(); };
 document.getElementById('ai-model').onchange = () => { if (img) autoAnnotate(); };
-
-// ページ表示直後からエンジンを裏で先読み（ドロップ即解析のため）
-setTimeout(() => { getRemover().catch(() => {}); }, 500);
 
 aiClearBtn.onclick = () => {
   snapshot();

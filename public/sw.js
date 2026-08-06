@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hitbox-snap-v2';
+const CACHE_NAME = 'hitbox-snap-v3';
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
@@ -7,11 +7,7 @@ const APP_SHELL = [
   '/icon-512.png',
   '/samples/cat.jpg',
   '/samples/hamster.jpg',
-  '/samples/fugu.jpg',
-  '/samples/demo-cat.jpg',
-  '/samples/demo-hamster.jpg',
-  '/samples/demo-fugu.jpg',
-  '/samples/ogp.jpg'
+  '/samples/fugu.jpg'
 ];
 
 self.addEventListener('install', event => {
@@ -30,15 +26,22 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;
+  const isPage = event.request.mode === 'navigate';
+  if (isPage) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put('/', response.clone()));
+          return response;
+        })
+        .catch(() => caches.match('/'))
+    );
+    return;
+  }
   event.respondWith(
-    fetch(event.request)
-      .then(response => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
-        }
-        return response;
-      })
-      .catch(() => caches.match(event.request).then(response => response || caches.match('/')))
+    caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
+      if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()));
+      return response;
+    }))
   );
 });
