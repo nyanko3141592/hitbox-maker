@@ -693,6 +693,14 @@
         <input type="range" id="ai-grid" min="6" max="40" value="20">
         <output id="ai-grid-out" class="mono">20</output>
       </div>
+      <div class="row">
+        <label for="background-mode">背景</label>
+        <select id="background-mode" disabled>
+          <option value="original" selected>元画像</option>
+          <option value="training">トレーニングルーム</option>
+          <option value="street">ストリートステージ</option>
+        </select>
+      </div>
       <p class="hint" id="ai-status">画像を入れると自動で食らい判定が付きます。初回のみAIモデルをダウンロード。</p>
     </section>
 
@@ -771,6 +779,7 @@ const stageWrap = document.getElementById('stage-wrap');
 const fileInput = document.getElementById('file-input');
 const boxList = document.getElementById('box-list');
 const exportBtn = document.getElementById('btn-export');
+const backgroundSelect = document.getElementById('background-mode');
 
 let img = null;
 let boxes = [];          // {id, type, x, y, w, h} 画像ピクセル座標
@@ -780,6 +789,9 @@ let selectedId = null;
 let fillOpacity = 0.30;
 let strokeWidth = 3;
 let lastBlob = null;   // 現在の画像の元Blob（imglyに渡す）
+let backgroundMode = 'original';
+let subjectCutout = null;
+let subjectBounds = null;
 
 // 画像を読み込んだ作業中は、戻る・更新・タブを閉じる操作で確認を出す。
 // beforeunload の文言はブラウザ側で統一されるため、独自メッセージは指定しない。
@@ -867,6 +879,11 @@ function loadFile(file) {
     aiClearBtn.disabled = true;
     maskCache = null;
     maskOverlay = null;
+    subjectCutout = null;
+    subjectBounds = null;
+    backgroundMode = 'original';
+    backgroundSelect.value = 'original';
+    backgroundSelect.disabled = true;
     showMask = false;
     maskBtn.disabled = true;
     maskBtn.textContent = '抽出部分を見る';
@@ -1019,9 +1036,95 @@ window.addEventListener('keydown', e => {
 });
 
 // ---- 描画 ----
+function drawTrainingBackground(c, w, h) {
+  c.fillStyle = '#d6d8dc';
+  c.fillRect(0, 0, w, h);
+  const grid = Math.max(24, Math.round(Math.min(w, h) / 10));
+  c.strokeStyle = '#9ca3ad';
+  c.lineWidth = Math.max(1, Math.round(Math.min(w, h) / 500));
+  c.beginPath();
+  for (let x = 0; x <= w; x += grid) { c.moveTo(x, 0); c.lineTo(x, h); }
+  for (let y = 0; y <= h; y += grid) { c.moveTo(0, y); c.lineTo(w, y); }
+  c.stroke();
+  c.strokeStyle = '#e0a82e';
+  c.lineWidth = Math.max(2, Math.round(Math.min(w, h) / 250));
+  c.beginPath();
+  c.moveTo(w / 2, 0); c.lineTo(w / 2, h);
+  c.moveTo(0, h * .72); c.lineTo(w, h * .72);
+  c.stroke();
+}
+
+function drawStreetBackground(c, w, h) {
+  const horizon = h * .58;
+  c.fillStyle = '#d8894d';
+  c.fillRect(0, 0, w, horizon);
+
+  c.fillStyle = '#29313d';
+  c.fillRect(0, h * .16, w * .2, horizon - h * .16);
+  c.fillRect(w * .17, h * .28, w * .2, horizon - h * .28);
+  c.fillRect(w * .7, h * .2, w * .3, horizon - h * .2);
+  c.fillStyle = '#48515e';
+  c.fillRect(w * .4, h * .34, w * .27, horizon - h * .34);
+
+  c.fillStyle = '#f2c14e';
+  const windowSize = Math.max(4, Math.round(Math.min(w, h) / 35));
+  for (let x = windowSize; x < w; x += windowSize * 3) {
+    c.fillRect(x, h * .3, windowSize, windowSize * .55);
+  }
+
+  c.fillStyle = '#4a4d55';
+  c.fillRect(0, horizon, w, h - horizon);
+  c.fillStyle = '#262a31';
+  c.beginPath();
+  c.moveTo(w * .17, h); c.lineTo(w * .42, horizon);
+  c.lineTo(w * .58, horizon); c.lineTo(w * .83, h);
+  c.closePath();
+  c.fill();
+
+  c.strokeStyle = '#d8d2c7';
+  c.lineWidth = Math.max(2, Math.round(Math.min(w, h) / 180));
+  c.setLineDash([Math.max(12, w * .04), Math.max(10, w * .025)]);
+  c.beginPath(); c.moveTo(w / 2, h); c.lineTo(w / 2, horizon); c.stroke();
+  c.setLineDash([]);
+
+  c.fillStyle = '#161b22';
+  const crowdY = horizon - h * .025;
+  for (let x = w * .04; x < w; x += w * .065) {
+    const head = Math.max(4, Math.min(w, h) * .012);
+    c.beginPath(); c.arc(x, crowdY - head * 2.2, head, 0, Math.PI * 2); c.fill();
+    c.fillRect(x - head * .75, crowdY - head * 1.3, head * 1.5, head * 2.2);
+  }
+}
+
+function drawSelectedBackground(c, w, h) {
+  if (backgroundMode === 'training') drawTrainingBackground(c, w, h);
+  if (backgroundMode === 'street') drawStreetBackground(c, w, h);
+}
+
+function drawSubjectShadow(c) {
+  if (!subjectBounds) return;
+  const width = Math.max(18, subjectBounds.w * .58);
+  const height = Math.max(5, width * .09);
+  c.save();
+  c.globalAlpha = .34;
+  c.fillStyle = '#000';
+  c.beginPath();
+  c.ellipse(subjectBounds.x + subjectBounds.w / 2, subjectBounds.y + subjectBounds.h, width / 2, height / 2, 0, 0, Math.PI * 2);
+  c.fill();
+  c.restore();
+}
+
 function drawScene(c, uiLayer) {
   c.clearRect(0, 0, canvas.width, canvas.height);
-  if (img) c.drawImage(img, 0, 0);
+  if (img) {
+    if (backgroundMode === 'original' || !subjectCutout) {
+      c.drawImage(img, 0, 0);
+    } else {
+      drawSelectedBackground(c, canvas.width, canvas.height);
+      drawSubjectShadow(c);
+      c.drawImage(subjectCutout, 0, 0);
+    }
+  }
   const rw = canvas.getBoundingClientRect().width;
   const scale = rw > 0 ? canvas.width / rw : 1;
   const sw = Math.max(1, Math.round(strokeWidth * scale));
@@ -1503,10 +1606,51 @@ function buildMaskOverlay() {
   return m;
 }
 
+function buildSubjectCutout() {
+  const w = maskCache.w, h = maskCache.h;
+  const cutout = document.createElement('canvas');
+  cutout.width = w; cutout.height = h;
+  const cg = cutout.getContext('2d');
+  cg.drawImage(img, 0, 0, w, h);
+
+  const matte = document.createElement('canvas');
+  matte.width = w; matte.height = h;
+  const mg = matte.getContext('2d');
+  const matteData = mg.createImageData(w, h);
+  let minX = w, minY = h, maxX = 0, maxY = 0;
+  for (let i = 0; i < maskCache.data.length; i++) {
+    const alpha = maskCache.data[i];
+    matteData.data[i * 4] = 255;
+    matteData.data[i * 4 + 1] = 255;
+    matteData.data[i * 4 + 2] = 255;
+    matteData.data[i * 4 + 3] = alpha;
+    if (alpha > 24) {
+      const x = i % w, y = (i / w) | 0;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  mg.putImageData(matteData, 0, 0);
+  cg.globalCompositeOperation = 'destination-in';
+  cg.drawImage(matte, 0, 0);
+  cg.globalCompositeOperation = 'source-over';
+  subjectBounds = minX <= maxX && minY <= maxY
+    ? { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 }
+    : null;
+  return cutout;
+}
+
 const maskBtn = document.getElementById('btn-mask');
 maskBtn.onclick = () => {
   showMask = !showMask;
   maskBtn.textContent = showMask ? '抽出表示中 ✓' : '抽出部分を見る';
+  render();
+};
+
+backgroundSelect.onchange = () => {
+  backgroundMode = backgroundSelect.value;
   render();
 };
 
@@ -1517,7 +1661,9 @@ async function autoAnnotate() {
   try {
     maskCache = await runSegmentation();
     maskOverlay = buildMaskOverlay();
+    subjectCutout = buildSubjectCutout();
     maskBtn.disabled = false;
+    backgroundSelect.disabled = false;
     stopFunMessages();
     regenerateBoxes();
     playFlash();
