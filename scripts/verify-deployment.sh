@@ -19,7 +19,7 @@ require_content_type() {
   local path="$1"
   local expected="$2"
   local actual
-  actual="$(curl --silent --show-error --location --head "$site_url$path" | tr -d '\r' | awk 'BEGIN{IGNORECASE=1} /^content-type:/{print $2; exit}')"
+  actual="$(curl --silent --show-error --location --head "$site_url$path" | tr -d '\r' | awk -F': ' 'tolower($1) == "content-type" {print $2; exit}')"
   if [[ "$actual" != "$expected"* ]]; then
     printf 'Expected Content-Type %s for %s, received %s\n' "$expected" "$path" "$actual" >&2
     exit 1

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hitbox-snap-v6';
+const CACHE_NAME = 'hitbox-snap-v7';
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',

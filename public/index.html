@@ -919,6 +919,10 @@ const backgroundUploadRow = document.getElementById('background-upload-row');
 const groundPositionRow = document.getElementById('ground-position-row');
 const groundPositionEl = document.getElementById('ground-position');
 const MOBILE_FAST_MODE = matchMedia('(max-width: 760px), (pointer: coarse)').matches;
+const LOW_POWER_MOBILE = MOBILE_FAST_MODE && (
+  (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
+  (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4)
+);
 document.getElementById('ai-model-row').hidden = MOBILE_FAST_MODE;
 
 let img = null;
@@ -933,6 +937,15 @@ let backgroundMode = 'original';
 let subjectCutout = null;
 let subjectBounds = null;
 let customBackground = null;
+let sceneBase = null;
+
+function invalidateSceneBase() {
+  if (sceneBase) {
+    sceneBase.width = 1;
+    sceneBase.height = 1;
+    sceneBase = null;
+  }
+}
 
 // 画像を読み込んだ作業中は、戻る・更新・タブを閉じる操作で確認を出す。
 // beforeunload の文言はブラウザ側で統一されるため、独自メッセージは指定しない。
@@ -1001,7 +1014,7 @@ window.addEventListener('paste', e => {
 
 // スマホでは編集Canvasを1280pxに抑える。画面表示では差が出にくく、
 // 2048px比で再描画するピクセル数とメモリ使用量を約6割削減できる。
-const MAX_IMAGE_DIMENSION = MOBILE_FAST_MODE ? 1280 : 2048;
+const MAX_IMAGE_DIMENSION = LOW_POWER_MOBILE ? 1024 : MOBILE_FAST_MODE ? 1280 : 2048;
 
 async function prepareWorkingImage(file) {
   const source = await createImageBitmap(file, { imageOrientation: 'from-image' });
@@ -1043,6 +1056,7 @@ async function loadFile(file) {
     document.getElementById('btn-tune').textContent = '微調整';
     canvas.width = img.width;
     canvas.height = img.height;
+    invalidateSceneBase();
     boxes = [];
     selectedId = null;
     dropzone.classList.add('hidden');
@@ -1295,17 +1309,34 @@ function drawSubjectShadow(c, offsetY) {
   c.restore();
 }
 
+// 元画像・背景・影は編集操作中には変化しないため、一度だけ合成する。
+// ドラッグ中はこの1枚と判定レイヤーだけを描き、背景処理を繰り返さない。
+function getSceneBase() {
+  if (sceneBase && sceneBase.width === canvas.width && sceneBase.height === canvas.height) return sceneBase;
+  sceneBase = document.createElement('canvas');
+  sceneBase.width = canvas.width;
+  sceneBase.height = canvas.height;
+  const base = sceneBase.getContext('2d');
+  const replacesBackground = img && backgroundMode !== 'original' && subjectCutout;
+  const offsetY = replacesBackground ? getSceneOffsetY() : 0;
+  if (replacesBackground) {
+    drawSelectedBackground(base, canvas.width, canvas.height);
+    drawSubjectShadow(base, offsetY);
+  }
+  base.save();
+  base.translate(0, offsetY);
+  if (img) base.drawImage(replacesBackground ? subjectCutout : img, 0, 0, canvas.width, canvas.height);
+  base.restore();
+  return sceneBase;
+}
+
 function drawScene(c, uiLayer) {
   c.clearRect(0, 0, canvas.width, canvas.height);
   const replacesBackground = img && backgroundMode !== 'original' && subjectCutout;
   const sceneOffsetY = replacesBackground ? getSceneOffsetY() : 0;
-  if (replacesBackground) {
-    drawSelectedBackground(c, canvas.width, canvas.height);
-    drawSubjectShadow(c, sceneOffsetY);
-  }
+  if (img) c.drawImage(getSceneBase(), 0, 0);
   c.save();
   c.translate(0, sceneOffsetY);
-  if (img) c.drawImage(replacesBackground ? subjectCutout : img, 0, 0);
   const scale = canvasDisplayScale;
   const sw = Math.max(1, Math.round(strokeWidth * scale));
 
@@ -1889,6 +1920,7 @@ function quickAnnotate() {
   maskCache = fastMask;
   maskOverlay = buildMaskOverlay();
   subjectCutout = buildSubjectCutout();
+  invalidateSceneBase();
   maskBtn.disabled = false;
   backgroundSelect.disabled = false;
   setAiStatus(`高速判定 ${rects.length} 個を生成。モデルDLなしですぐ保存できます。`);
@@ -2017,6 +2049,7 @@ function applyBackgroundMode(mode) {
   const isCustom = mode === 'custom';
   backgroundUploadRow.hidden = !isCustom;
   groundPositionRow.hidden = !isCustom;
+  invalidateSceneBase();
   render();
 }
 
@@ -2052,6 +2085,7 @@ backgroundInput.onchange = async () => {
 
 groundPositionEl.oninput = () => {
   document.getElementById('ground-position-out').textContent = groundPositionEl.value + '%';
+  invalidateSceneBase();
   scheduleRender(false);
 };
 
@@ -2068,6 +2102,7 @@ async function autoAnnotate() {
     maskCache = await runSegmentation();
     maskOverlay = buildMaskOverlay();
     subjectCutout = buildSubjectCutout();
+    invalidateSceneBase();
     maskBtn.disabled = false;
     backgroundSelect.disabled = false;
     aiBtn.textContent = 'AI再解析';
