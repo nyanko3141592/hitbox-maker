@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HITBOX SNAP — 写真を入れたら、判定が付く。</title>
-<meta name="description" content="画像を入れるだけで格ゲー風の当たり判定が付く。AIがブラウザ内でキャラを抜き出して食らい判定を自動生成。無料・登録不要・画像はどこにも送信されません。">
+<meta name="description" content="画像を入れるだけで格ゲー風の当たり判定がすぐ付く。無料・登録不要・画像はどこにも送信されません。背景変更や高精度化は端末内AIにも対応。">
 <meta name="robots" content="index,follow,max-image-preview:large">
 <meta name="theme-color" content="#101318">
 <link rel="canonical" href="https://hitbox.nya3neko2.dev/">
@@ -14,12 +14,12 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="HITBOX SNAP">
 <meta property="og:title" content="HITBOX SNAP — 写真を入れたら、判定が付く。">
-<meta property="og:description" content="画像を入れるだけで格ゲー風の当たり判定が付く。AIがローカルで自動生成、無料。">
+<meta property="og:description" content="画像を入れるだけで格ゲー風の当たり判定がすぐ付く。無料・登録不要・画像送信なし。">
 <meta property="og:image" content="https://hitbox.nya3neko2.dev/samples/ogp.jpg">
 <meta property="og:url" content="https://hitbox.nya3neko2.dev/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="HITBOX SNAP — 写真を入れたら、判定が付く。">
-<meta name="twitter:description" content="画像を入れるだけで格ゲー風の当たり判定が付く。AIがローカルで自動生成、無料。">
+<meta name="twitter:description" content="画像を入れるだけで格ゲー風の当たり判定がすぐ付く。無料・登録不要・画像送信なし。">
 <meta name="twitter:image" content="https://hitbox.nya3neko2.dev/samples/ogp.jpg">
 <script type="application/ld+json">
 {
@@ -33,7 +33,8 @@
   "isAccessibleForFree": true,
   "image": "https://hitbox.nya3neko2.dev/samples/ogp.jpg",
   "featureList": [
-    "ブラウザ内AIによる食らい判定の自動生成",
+    "モデル不要の高速解析による食らい判定の即時生成",
+    "任意のブラウザ内AI高精度化",
     "攻撃・投げ・押し合い判定の手動編集",
     "透かし入りPNGの保存・コピー"
   ],
@@ -718,7 +719,7 @@
     <div class="round-status" aria-hidden="true"><span>ROUND 01</span></div>
     <h1 class="logo">HITBOX <span>SNAP</span></h1>
     <p class="tagline">写真を入れたら、判定が付く。</p>
-    <p class="sub">AIがキャラを抜き出して食らい判定を自動生成。解析はぜんぶ端末の中、どこにも送信されません。</p>
+    <p class="sub">写真を入れたら即判定。背景変更や高精度化も端末内AIで対応。画像はどこにも送信されません。</p>
     <div class="cta">
       <button id="btn-home-open" class="primary big">FIGHT! 写真を選ぶ</button>
       <button id="btn-home-sample" class="big">DEMO</button>
@@ -747,7 +748,7 @@
   <h2>利用規約とプライバシー</h2>
   <ol>
     <li><strong>画像はどこにも送信されません。</strong>読み込んだ画像・生成した画像の処理は、すべてあなたのブラウザ内（端末内）で完結します。当サイトはサーバーに画像を保存・送信・収集しません。</li>
-    <li><strong>通信が発生するのは初回のAIモデル取得のみ。</strong>AI解析に使うモデルファイルを配信CDNからダウンロードします（画像データは含まれません）。以降はブラウザにキャッシュされます。</li>
+    <li><strong>通常の判定生成にAIモデルのダウンロードは不要です。</strong>背景変更や「高精度AI」を選んだ場合だけ、解析モデルを配信CDNから取得します（画像データは含まれません）。以降はブラウザにキャッシュされます。</li>
     <li><strong>生成した画像の権利はあなたにあります。</strong>商用・非商用を問わず自由に利用できます。ただし、元画像に第三者の権利（著作権・肖像権など）が含まれる場合の確認と責任は利用者にあります。</li>
     <li><strong>本ツールは無保証で提供されます。</strong>AGPL-3.0ライセンスに基づき現状有姿で提供され、利用によって生じたいかなる損害についても作者は責任を負いません。</li>
     <li><strong>アカウント登録・Cookie・アクセス解析なし。</strong>個人情報は一切収集しません。</li>
@@ -795,7 +796,7 @@
 
     <section>
       <div class="btn-row">
-        <button id="btn-ai" class="primary" disabled>AI再解析</button>
+        <button id="btn-ai" class="primary" disabled>高精度AI</button>
         <button id="btn-mask" disabled>抽出を見る</button>
       </div>
       <div class="row">
@@ -820,7 +821,7 @@
         <input type="range" id="ground-position" min="45" max="95" value="72">
         <output id="ground-position-out" class="mono">72%</output>
       </div>
-      <p class="hint" id="ai-status">画像を入れると自動で食らい判定が付きます。初回のみAIモデルをダウンロード。</p>
+      <p class="hint" id="ai-status">画像を入れると、ダウンロードなしですぐ判定が付きます。</p>
     </section>
 
     <section id="share-panel">
@@ -1028,7 +1029,6 @@ async function prepareWorkingImage(file) {
 
 async function loadFile(file) {
   if (!confirmImageReplacement()) return;
-  warmAiEngine();
   try {
     const prepared = await prepareWorkingImage(file);
     if (img && typeof img.close === 'function') img.close();
@@ -1051,6 +1051,7 @@ async function loadFile(file) {
     history.length = 0;
     updateUndoState();
     aiBtn.disabled = false;
+    aiBtn.textContent = '高精度AI';
     aiClearBtn.disabled = true;
     maskCache = null;
     maskOverlay = null;
@@ -1065,7 +1066,7 @@ async function loadFile(file) {
     maskBtn.disabled = true;
     maskBtn.textContent = '抽出部分を見る';
     render();
-    autoAnnotate(); // 入れたら勝手に食らい判定
+    quickAnnotate(); // モデル不要の高速判定を即生成
   } catch (err) {
     console.error(err);
     alert('画像を読み込めませんでした。別の画像でもう一度お試しください。');
@@ -1611,11 +1612,6 @@ async function getRemover() {
 
 function warmAiEngine() { getRemover().catch(() => {}); }
 
-for (const id of ['btn-home-open', 'btn-home-sample', 'btn-open']) {
-  document.getElementById(id).addEventListener('pointerdown', warmAiEngine, { once: true });
-}
-stageWrap.addEventListener('dragenter', warmAiEngine, { once: true });
-
 async function runSegmentation() {
   const removeBg = await getRemover();
   const baseConfig = {
@@ -1767,6 +1763,80 @@ function maskToBoxes(mask, gridCount, coverTarget) {
     rects.push({ x: rc.c * cx, y: rc.r * cy, w: rc.w * cx, h: rc.h * cy });
   }
   return rects;
+}
+
+// 大型AIモデルを使わず、画像端の色を背景の手掛かりにして即座に判定を作る。
+// ジョーク用途の初期結果を待たせないことを優先し、高精度化は任意のAI解析に任せる。
+function quickAnnotate() {
+  const maxSide = 128;
+  const scale = maxSide / Math.max(canvas.width, canvas.height);
+  const w = Math.max(24, Math.round(canvas.width * scale));
+  const h = Math.max(24, Math.round(canvas.height * scale));
+  const sample = document.createElement('canvas');
+  sample.width = w;
+  sample.height = h;
+  const sg = sample.getContext('2d', { willReadFrequently: true });
+  sg.drawImage(img, 0, 0, w, h);
+  const pixels = sg.getImageData(0, 0, w, h).data;
+  const palette = [];
+  const addPalette = (x, y) => {
+    const i = (y * w + x) * 4;
+    if (pixels[i + 3] > 16) palette.push([pixels[i], pixels[i + 1], pixels[i + 2]]);
+  };
+  const step = Math.max(2, Math.round(Math.min(w, h) / 16));
+  for (let x = 0; x < w; x += step) { addPalette(x, 0); addPalette(x, h - 1); }
+  for (let y = step; y < h - 1; y += step) { addPalette(0, y); addPalette(w - 1, y); }
+
+  const alpha = new Uint8ClampedArray(w * h);
+  const baseThreshold = 30 * 30;
+  for (let y = 2; y < h - 2; y++) {
+    for (let x = 2; x < w - 2; x++) {
+      const i = (y * w + x) * 4;
+      let nearest = Infinity;
+      for (const color of palette) {
+        const dr = pixels[i] - color[0];
+        const dg = pixels[i + 1] - color[1];
+        const db = pixels[i + 2] - color[2];
+        const distance = dr * dr + dg * dg + db * db;
+        if (distance < nearest) nearest = distance;
+      }
+      const centerX = Math.abs((x + .5) / w - .5) * 2;
+      const centerY = Math.abs((y + .5) / h - .5) * 2;
+      const centerBias = Math.max(centerX, centerY);
+      const threshold = baseThreshold * (.72 + centerBias * .45);
+      if (pixels[i + 3] > 32 && nearest > threshold) alpha[y * w + x] = 255;
+    }
+  }
+
+  const fastMask = { data: alpha, w, h };
+  keepLargestComponent(alpha, w, h);
+  let rects = maskToBoxes(fastMask, Math.min(18, +aiGridEl.value), .88);
+  if (rects.length === 0) {
+    rects = [
+      { x: w * .3, y: h * .16, w: w * .4, h: h * .28 },
+      { x: w * .18, y: h * .38, w: w * .64, h: h * .42 },
+    ];
+  }
+  const sx = canvas.width / w;
+  const sy = canvas.height / h;
+  boxes = boxes.filter(box => !box.aiGenerated);
+  for (const rect of rects) {
+    boxes.push({
+      id: nextId++,
+      type: 'hurt',
+      aiGenerated: true,
+      x: rect.x * sx,
+      y: rect.y * sy,
+      w: rect.w * sx,
+      h: rect.h * sy,
+    });
+  }
+  history.length = 0;
+  updateUndoState();
+  aiClearBtn.disabled = boxes.length === 0;
+  setAiStatus(`高速判定 ${rects.length} 個を生成。すぐ保存できます。背景変更は「高精度AI」から。`);
+  render();
+  playFlash();
 }
 
 function regenerateBoxes(options = {}) {
@@ -1939,6 +2009,7 @@ async function autoAnnotate() {
     subjectCutout = buildSubjectCutout();
     maskBtn.disabled = false;
     backgroundSelect.disabled = false;
+    aiBtn.textContent = 'AI再解析';
     stopFunMessages();
     regenerateBoxes({ preserveUndo: false });
     history.length = 0;
@@ -1955,6 +2026,7 @@ async function autoAnnotate() {
 }
 
 aiBtn.onclick = () => { if (img) autoAnnotate(); };
+aiBtn.addEventListener('pointerdown', warmAiEngine, { once: true });
 document.getElementById('ai-model').onchange = () => { if (img) autoAnnotate(); };
 
 aiClearBtn.onclick = () => {
