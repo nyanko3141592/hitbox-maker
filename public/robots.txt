@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://hitbox-maker.takahashinaoki521.workers.dev/sitemap.xml
